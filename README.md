@@ -11,7 +11,7 @@ use sincere::Response;
 fn main() {
     let mut app = Micro::new();
 
-    app.add("GET", "/", |_request| {
+    app.add("GET", "/", |request| {
         println!("{:?}", request.headers);
         Response::from_string("Hello Sincere")
     });
