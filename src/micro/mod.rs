@@ -37,6 +37,42 @@ impl Micro {
         self.routes.last_mut().unwrap()
     }
 
+    pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&Request) -> Response + Send + Sync + 'static
+    {
+        self.add("GET", pattern, handle)
+    }
+
+    pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&Request) -> Response + Send + Sync + 'static
+    {
+        self.add("POST", pattern, handle)
+    }
+
+    pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&Request) -> Response + Send + Sync + 'static
+    {
+        self.add("PUT", pattern, handle)
+    }
+
+    pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&Request) -> Response + Send + Sync + 'static
+    {
+        self.add("DELETE", pattern, handle)
+    }
+
+    pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&Request) -> Response + Send + Sync + 'static
+    {
+        self.add("OPTION", pattern, handle)
+    }
+
+    pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&Request) -> Response + Send + Sync + 'static
+    {
+        self.add("HEAD", pattern, handle)
+    }
+
     pub fn handle(&self, stream: Stream) {
         let mut http = Http::new(stream);
         let request = http.decode();
