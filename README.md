@@ -6,14 +6,13 @@ Sincere is http server and micro web framework for Rust(stable) based on Mio and
 extern crate sincere;
 
 use sincere::Micro;
-use sincere::Response;
 
 fn main() {
     let mut app = Micro::new();
 
-    app.add("GET", "/", |request| {
+    app.add("GET", "/", |request, response| {
         println!("{:?}", request.headers);
-        Response::from_string("Hello Sincere")
+        response.from_text("Hello Sincere");
     });
 
     app.run("127.0.0.1:8000");
