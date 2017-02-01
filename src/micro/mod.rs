@@ -18,6 +18,7 @@ pub struct Micro {
     before: Vec<Middleware>,
     after: Vec<Middleware>,
     finish: Vec<Middleware>,
+    not_found: Option<Middleware>,
 }
 
 impl Micro {
@@ -27,6 +28,7 @@ impl Micro {
             before: Vec::new(),
             after: Vec::new(),
             finish: Vec::new(),
+            not_found: None,
         }
     }
 
@@ -83,6 +85,30 @@ impl Micro {
         where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.before.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
+    pub fn after<H>(&mut self, handle: H)
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.after.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
+    pub fn finish<H>(&mut self, handle: H)
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.finish.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
+    pub fn not_found<H>(&mut self, handle: H)
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.not_found = Some(Middleware {
             inner: Box::new(handle),
         });
     }
@@ -148,7 +174,11 @@ impl Micro {
         }
 
         if !route_found {
-            response.status(404).from_text("Not Found");
+            if let Some(ref not_found) = self.not_found {
+                not_found.execute(&mut request, &mut response);
+            } else {
+                response.status(404).from_text("Not Found");
+            }
         }
 
         for finish in &self.finish {

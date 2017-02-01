@@ -47,4 +47,8 @@ impl Request {
     pub fn data_length(&self) -> usize {
         self.data.len()
     }
+
+    pub fn data(&self) -> &Vec<u8> {
+        self.data.as_ref()
+    }
 }
