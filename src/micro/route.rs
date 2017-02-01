@@ -5,7 +5,7 @@ use http::Method;
 use http::Request;
 use http::Response;
 
-type Handle = Fn(&Request) -> Response + Send + Sync + 'static;
+pub type Handle = Fn(&mut Request, &mut Response) + Send + Sync + 'static;
 
 pub struct Route {
     pub pattern: String,

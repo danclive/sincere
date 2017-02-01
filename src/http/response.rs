@@ -32,57 +32,60 @@ impl Response {
         )
     }
 
-    pub fn from_data<D>(data: D) -> Response
+    pub fn from_data<D>(&mut self, data: D) -> &mut Response
         where D: Into<Vec<u8>>
     {
         let data = data.into();
         let data_len = data.len();
 
-        Response::new(
-            StatusCode(200),
-            HashMap::new(),
-            Some(data_len),
-            data,
-        )
+        self.data_length = Some(data_len);
+        self.data = data;
+        self
     }
 
-    pub fn from_file(mut file: File) -> Response {
+    pub fn from_file(&mut self, mut file: File) -> &mut Response {
         let file_size = file.metadata().ok().map(|v| v.len() as usize);
 
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data).unwrap();
 
-        Response::new(
-            StatusCode(200),
-            HashMap::new(),
-            file_size,
-            data,
-        )
+        self.data_length = file_size;
+        self.data = data;
+        self
     }
 
-    pub fn from_string<S>(string: S) -> Response
+    pub fn from_text<S>(&mut self, string: S) -> &mut Response
         where S: Into<String>
     {
         let string = string.into();
         let data_len = string.len();
 
-        let mut headers = HashMap::new();
-        headers.insert("Content-Type".to_owned(), "text/plain; charset=UTF-8".to_owned());
+        self.headers.insert("Content-Type".to_owned(), "text/plain; charset=UTF-8".to_owned());
 
-        Response::new(
-            StatusCode(200),
-            headers,
-            Some(data_len),
-            string.into(),
-        )
+        self.data_length = Some(data_len);
+        self.data = string.into();
+        self
     }
 
-    pub fn with_code(mut self, code: u16) -> Response {
+    pub fn from_html<S>(&mut self, string: S) -> &mut Response
+        where S: Into<String>
+    {
+        let string = string.into();
+        let data_len = string.len();
+
+        self.headers.insert("Content-Type".to_owned(), "text/html; charset=UTF-8".to_owned());
+
+        self.data_length = Some(data_len);
+        self.data = string.into();
+        self
+    }
+
+    pub fn status(&mut self, code: u16) -> &mut Response {
         self.status_code = code.into();
         self
     }
 
-    pub fn with_header(mut self, header: (String, String)) -> Response {
+    pub fn header(&mut self, header: (String, String)) -> &mut Response {
         self.headers.insert(header.0, header.1);
         self
     }

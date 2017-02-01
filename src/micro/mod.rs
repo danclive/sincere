@@ -15,17 +15,23 @@ mod route;
 
 pub struct Micro {
     routes: Vec<Route>,
+    before: Vec<Middleware>,
+    after: Vec<Middleware>,
+    finish: Vec<Middleware>,
 }
 
 impl Micro {
     pub fn new() -> Micro {
         Micro {
             routes: Vec::new(),
+            before: Vec::new(),
+            after: Vec::new(),
+            finish: Vec::new(),
         }
     }
 
     pub fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         let route = Route::new(
             method.parse().unwrap(), 
@@ -38,44 +44,53 @@ impl Micro {
     }
 
     pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("GET", pattern, handle)
     }
 
     pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("POST", pattern, handle)
     }
 
     pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("PUT", pattern, handle)
     }
 
     pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("DELETE", pattern, handle)
     }
 
     pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("OPTION", pattern, handle)
     }
 
     pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&Request) -> Response + Send + Sync + 'static
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("HEAD", pattern, handle)
     }
 
+    pub fn before<H>(&mut self, handle: H)
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.before.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
     pub fn handle(&self, stream: Stream) {
         let mut http = Http::new(stream);
-        let request = http.decode();
+        let mut request = http.decode();
+        let mut response = Response::empty(200);
 
         let mut route_found = false;
 
@@ -117,16 +132,30 @@ impl Micro {
             }
 
             if route_found {
-                let ref handle = route.handle;
-                let response = handle(&request);
-                http.encode(response);
+                
+                for before in &self.before {
+                    before.execute(&mut request, &mut response);
+                }
+
+                route.handle.as_ref()(&mut request, &mut response);
+
+                for after in &self.after {
+                    after.execute(&mut request, &mut response);
+                }
+
                 break;
             }
         }
 
         if !route_found {
-            http.encode(Response::from_string("404"));
+            response.status(404).from_text("Not Found");
         }
+
+        for finish in &self.finish {
+            finish.execute(&mut request, &mut response);
+        }
+
+        http.encode(response);
     }
 
     pub fn run(self, addr: &str) {
@@ -137,5 +166,15 @@ impl Micro {
         }));
 
         server.run(addr).unwrap();
+    }
+}
+
+struct Middleware {
+    inner: Box<route::Handle>,
+}
+
+impl Middleware {
+    fn execute(&self, request: &mut Request, response: &mut Response) {
+        self.inner.as_ref()(request, response);
     }
 }
