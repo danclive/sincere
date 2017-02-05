@@ -36,12 +36,7 @@ impl Server {
     }
 
     fn token(&mut self) -> Token {
-        if self.token >= usize::max_value() - 4 {
-            self.token = 4;
-        } else {
-            self.token += 1;
-        }
-
+        self.token += 1;
         Token(self.token)
     }
 

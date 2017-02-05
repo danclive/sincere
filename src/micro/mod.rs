@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use regex::Regex;
 
 use server::Server;
@@ -137,7 +135,6 @@ impl Micro {
 
             let pattern = route.compilied_pattern.clone();
 
-            let mut params: HashMap<String, String> = HashMap::new();
             if pattern.contains("^") {
                 let re = Regex::new(&pattern).unwrap();
                 let caps = re.captures(&path);
@@ -148,7 +145,7 @@ impl Micro {
                     let matches = route.paths.clone();
 
                     for (key, value) in matches.iter() {
-                        params.insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                        request.params.insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
                     }
                 }
             } else {

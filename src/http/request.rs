@@ -8,6 +8,7 @@ pub struct Request {
     pub path: String,
     version: String,
     pub headers: HashMap<String, String>,
+    pub params: HashMap<String, String>,
     pub remote_addr: SocketAddr,
     data: Vec<u8>,
 }
@@ -19,6 +20,7 @@ impl Request {
             path: path,
             version: version,
             headers: headers,
+            params: HashMap::new(),
             remote_addr: remote_addr,
             data: data,
         }
@@ -50,5 +52,9 @@ impl Request {
 
     pub fn data(&self) -> &Vec<u8> {
         self.data.as_ref()
+    }
+
+    pub fn get_param(&self, key: String) -> Option<String> {
+        self.params.get(&key).map(|v| v.to_string())
     }
 }
