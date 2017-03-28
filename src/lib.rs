@@ -1,5 +1,5 @@
-extern crate mio;
-extern crate num_cpus;
+extern crate soio;
+extern crate threading;
 extern crate chrono;
 extern crate regex;
 

@@ -1,14 +1,16 @@
 use std::sync::{Arc, Mutex};
-use std::io::Read;
-use std::io::Write;
+use std::io::{self, Read, Write};
 use std::io::ErrorKind::WouldBlock;
-use std::mem;
 
-use mio::Token;
-use mio::tcp::TcpStream;
-use mio::channel;
+use soio::Token;
+use soio::tcp::TcpStream;
+use soio::channel;
+use soio::Evented;
+use soio::Poll;
+use soio::Ready;
+use soio::PollOpt;
 
-use util::TaskPool;
+use threading::Pool;
 
 use super::Handle;
 use super::stream::Stream;
@@ -19,22 +21,22 @@ pub enum Event {
     Read(Token),
 }
 
-pub struct Connention {
-    pub socket: TcpStream,
+pub struct Connection {
+    socket: TcpStream,
     token: Token,
-    task_pool: TaskPool,
+    thread_pool: Pool,
     tx: channel::Sender<Event>,
     writer: Arc<Mutex<Vec<u8>>>,
     pub closing: bool,
     handle: Arc<Handle>,
 }
 
-impl Connention {
-    pub fn new(socket: TcpStream, token: Token, task_pool: TaskPool, tx: channel::Sender<Event>, handle: Arc<Handle>) -> Connention {
-        Connention {
+impl Connection {
+    pub fn new(socket: TcpStream, token: Token, thread_pool: Pool, tx: channel::Sender<Event>, handle: Arc<Handle>) -> Connection {
+        Connection {
             socket: socket,
             token: token,
-            task_pool: task_pool,
+            thread_pool: thread_pool,
             tx: tx,
             writer: Arc::new(Mutex::new(Vec::new())),
             closing: false,
@@ -77,12 +79,10 @@ impl Connention {
 
         let remote_addr = self.socket.peer_addr().unwrap();
 
-        self.task_pool.spawn(Box::new(move || {
-
-            handle(Stream::new(mem::replace(&mut reader, Vec::new()), writer.clone(), remote_addr));
-
+        self.thread_pool.spawn(move || {
+            handle(Stream::new(reader, writer, remote_addr));
             tx.send(Event::Write(token)).is_ok();
-        }));
+        });
     }
 
     pub fn write(&mut self) {
@@ -97,5 +97,23 @@ impl Connention {
                 return;
             }
         }
+    }
+}
+
+impl Evented for Connection {
+    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+         -> io::Result<()>
+    {
+        self.socket.register(poll, token, interest, opts)
+    }
+
+    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
+         -> io::Result<()>
+    {
+        self.socket.reregister(poll, token, interest, opts)
+    }
+
+    fn deregister(&self, poll: &Poll) -> io::Result<()> {
+        self.socket.deregister(poll)
     }
 }
