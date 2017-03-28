@@ -186,13 +186,14 @@ impl Micro {
     }
 
     pub fn run(self, addr: &str) {
-        let mut server = Server::new();
+
+        let mut server = Server::new(addr).unwrap();
         
         server.handle(Box::new(move |stream| {
             self.handle(stream);
         }));
 
-        server.run(addr).unwrap();
+        server.run().unwrap();
     }
 }
 
