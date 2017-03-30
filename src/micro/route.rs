@@ -4,8 +4,7 @@ use std::ascii::AsciiExt;
 use http::Method;
 use http::Request;
 use http::Response;
-
-pub type Handle = Fn(&mut Request, &mut Response) + Send + Sync + 'static;
+use super::Handle;
 
 pub struct Route {
     pub pattern: String,

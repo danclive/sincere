@@ -12,6 +12,8 @@ pub use self::route::Group;
 
 mod route;
 
+pub type Handle = Fn(&mut Request, &mut Response) + Send + Sync + 'static;
+
 pub struct Micro {
     routes: Vec<Route>,
     before: Vec<Middleware>,
@@ -210,7 +212,7 @@ impl Micro {
 }
 
 struct Middleware {
-    inner: Box<route::Handle>,
+    inner: Box<Handle>,
 }
 
 impl Middleware {
