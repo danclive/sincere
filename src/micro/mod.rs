@@ -8,6 +8,7 @@ use http::Request;
 use http::Response;
 
 use self::route::Route;
+pub use self::route::Group;
 
 mod route;
 
@@ -30,7 +31,7 @@ impl Micro {
         }
     }
 
-    pub fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
+    fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
         where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         let route = Route::new(
@@ -77,6 +78,10 @@ impl Micro {
         where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
         self.add("HEAD", pattern, handle)
+    }
+
+    pub fn mount(&mut self, mut group: Group) {
+        self.routes.append(group.routes.as_mut());
     }
 
     pub fn before<H>(&mut self, handle: H)
@@ -133,7 +138,14 @@ impl Micro {
                 }
             };
 
-            let pattern = route.compilied_pattern.clone();
+            let pattern = {
+                let pattern = route.compilied_pattern.clone();
+                if pattern != "/" {
+                    pattern.trim_right_matches('/').to_owned()
+                } else {
+                    pattern
+                }
+            };
 
             if pattern.contains("^") {
                 let re = Regex::new(&pattern).unwrap();

@@ -52,6 +52,68 @@ impl Route {
     }
 }
 
+pub struct Group {
+    pub routes: Vec<Route>,
+    prefix: String,
+}
+
+impl Group {
+    pub fn new(prefix: &str) -> Group {
+        Group {
+            routes: Vec::new(),
+            prefix: prefix.to_owned(),
+        }
+    }
+    fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        let route = Route::new(
+            method.parse().unwrap(), 
+            self.prefix.clone() + pattern, 
+            Box::new(handle),
+        );
+
+        self.routes.push(route);
+        self.routes.last_mut().unwrap()
+    }
+
+    pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.add("GET", pattern, handle)
+    }
+
+    pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.add("POST", pattern, handle)
+    }
+
+    pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.add("PUT", pattern, handle)
+    }
+
+    pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.add("DELETE", pattern, handle)
+    }
+
+    pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.add("OPTION", pattern, handle)
+    }
+
+    pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.add("HEAD", pattern, handle)
+    }
+}
+
 fn extract_named_params(pattern: &str) -> Result<(String, HashMap<String, usize>), ()> {
     
     let mut parenthese_count = 0;

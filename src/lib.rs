@@ -8,6 +8,7 @@ pub use http::Http;
 pub use http::Request;
 pub use http::Response;
 pub use micro::Micro;
+pub use micro::Group;
 
 pub mod server;
 pub mod http;
