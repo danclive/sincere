@@ -1,6 +1,6 @@
 # Sincere
 
-Sincere is http server and micro web framework for Rust(stable) based on Mio and multithreadind. Here is an example of a simple application:
+Sincere is http server and micro web framework for Rust(stable) based on epoll, kqueue and multithreadind. Here is an example of a simple application:
 
 ```rust
 extern crate sincere;
