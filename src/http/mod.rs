@@ -66,7 +66,8 @@ impl Http {
             method.parse().unwrap(),
             path.to_owned(),
             version.to_owned(),
-            headers, remote_addr,
+            headers,
+            remote_addr,
             self.stream.to_vec()
         )
     }

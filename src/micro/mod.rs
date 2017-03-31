@@ -126,7 +126,7 @@ impl Micro {
         let mut route_found = false;
 
         for route in &self.routes {
-            if route.method != request.method() {
+            if route.method != *request.method() {
                 continue;
             }
 
@@ -159,7 +159,7 @@ impl Micro {
                     let matches = route.paths.clone();
 
                     for (key, value) in matches.iter() {
-                        request.params.insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                        request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
                     }
                 }
             } else {

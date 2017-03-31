@@ -10,7 +10,7 @@ use sincere::Micro;
 fn main() {
     let mut app = Micro::new();
 
-    app.add("GET", "/", |request, response| {
+    app.get("/", |request, response| {
         println!("{:?}", request.headers);
         response.from_text("Hello Sincere");
     });

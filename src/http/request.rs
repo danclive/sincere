@@ -4,12 +4,12 @@ use std::net::SocketAddr;
 use super::http_method::Method;
 
 pub struct Request {
-    pub method: Method,
-    pub path: String,
+    method: Method,
+    path: String,
     version: String,
-    pub headers: HashMap<String, String>,
-    pub params: HashMap<String, String>,
-    pub remote_addr: SocketAddr,
+    headers: HashMap<String, String>,
+    params: HashMap<String, String>,
+    remote_addr: SocketAddr,
     data: Vec<u8>,
 }
 
@@ -26,24 +26,30 @@ impl Request {
         }
     }
 
-    pub fn method(&self) -> Method {
-        self.method.clone()
+    pub fn method(&self) -> &Method {
+        &self.method
     }
 
-    pub fn path(&self) -> String {
-        self.path.clone()
+    pub fn path(&self) -> &str {
+        &self.path
     }
 
-    pub fn version(&self) -> String {
-        self.version.clone()
+    pub fn version(&self) -> &str {
+        &self.version
     }
 
-    pub fn headers(&self) -> HashMap<String, String> {
-        self.headers.clone()
+    pub fn headers(&mut self) -> &mut HashMap<String, String> {
+        &mut self.headers
     }
 
-    pub fn remote_addr(&self) -> SocketAddr {
-        self.remote_addr.clone()
+    pub fn get_header<'a, S>(&self, key: S) -> Option<String>
+        where S: Into<&'a str>
+    {
+        self.headers.get(key.into()).map(|v| v.to_string())
+    }
+
+    pub fn remote_addr(&self) -> &SocketAddr {
+        &self.remote_addr
     }
 
     pub fn data_length(&self) -> usize {
@@ -51,10 +57,16 @@ impl Request {
     }
 
     pub fn data(&self) -> &Vec<u8> {
-        self.data.as_ref()
+        &self.data
     }
 
-    pub fn get_param(&self, key: String) -> Option<String> {
-        self.params.get(&key).map(|v| v.to_string())
+    pub fn params(&mut self) -> &mut HashMap<String, String> {
+        &mut self.params
+    }
+
+    pub fn get_param<'a, S>(&self, key: S) -> Option<String>
+        where S: Into<&'a str>
+    {
+        self.params.get(key.into()).map(|v| v.to_string())
     }
 }

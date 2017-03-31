@@ -32,22 +32,28 @@ impl Response {
         )
     }
 
-    pub fn from_data<D>(&mut self, data: D) -> &mut Response
-        where D: Into<Vec<u8>>
+    pub fn from_data<C, D>(&mut self, content_type: C,data: D) -> &mut Response
+        where C: Into<String>, D: Into<Vec<u8>>
     {
         let data = data.into();
         let data_len = data.len();
+
+        self.headers.insert("Content-Type".to_owned(), content_type.into());
 
         self.data_length = Some(data_len);
         self.data = data;
         self
     }
 
-    pub fn from_file(&mut self, mut file: File) -> &mut Response {
+    pub fn from_file<C>(&mut self, content_type: C, mut file: File) -> &mut Response
+        where C: Into<String>
+    {
         let file_size = file.metadata().ok().map(|v| v.len() as usize);
 
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data).unwrap();
+
+        self.headers.insert("Content-Type".to_owned(), content_type.into());
 
         self.data_length = file_size;
         self.data = data;
@@ -85,8 +91,10 @@ impl Response {
         self
     }
 
-    pub fn header(&mut self, header: (String, String)) -> &mut Response {
-        self.headers.insert(header.0, header.1);
+    pub fn header<S>(&mut self, header: (S, S)) -> &mut Response
+        where S: Into<String>
+    {
+        self.headers.insert(header.0.into(), header.1.into());
         self
     }
 }

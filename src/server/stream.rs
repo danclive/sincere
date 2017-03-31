@@ -48,7 +48,7 @@ impl Read for Stream {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         let amt = cmp::min(buf.len(), self.reader.len());
         
-        let reader = self.reader.clone();
+        let reader = mem::replace(&mut self.reader, Vec::new());
         let (a, b) = reader.split_at(amt);
         buf[..amt].copy_from_slice(a);
         self.reader = b.to_vec();
