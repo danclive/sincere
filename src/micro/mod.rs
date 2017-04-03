@@ -202,12 +202,10 @@ impl Micro {
     pub fn run(self, addr: &str) {
 
         let mut server = Server::new(addr).unwrap();
-        
-        server.handle(Box::new(move |stream| {
-            self.handle(stream);
-        }));
 
-        server.run().unwrap();
+        server.run(Box::new(move |stream| {
+            self.handle(stream);
+        })).unwrap();
     }
 }
 
