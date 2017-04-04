@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::sync::Arc;
 use std::net::ToSocketAddrs;
-use std::io;
+use std::io::{self, ErrorKind};
+use std::sync::mpsc::TryRecvError;
 
 use soio::Token;
 use soio::Poll;
@@ -104,8 +105,11 @@ impl Server {
                         }
                     }
                 },
-                Err(_) => {
-                    break;
+                Err(err) => {
+                    match err {
+                        TryRecvError::Empty => break,
+                        TryRecvError::Disconnected => return Err(io::Error::new(ErrorKind::ConnectionAborted, err)),
+                    }
                 }
             }
         }
@@ -174,7 +178,7 @@ impl Server {
     }
 
     pub fn run_once(&mut self) -> io::Result<()> {
-        let size = try!(self.poll.poll(&mut self.events, None));
+        let size = self.poll.poll(&mut self.events, None)?;
 
         for i in 0..size {
             let event = self.events.get(i).unwrap();
@@ -194,7 +198,7 @@ impl Server {
         self.run = true;
 
         while self.run {
-            try!(self.run_once())
+            self.run_once()?;
         }
 
         Ok(())
