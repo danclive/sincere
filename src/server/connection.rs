@@ -38,14 +38,14 @@ impl Connection {
             token: token,
             thread_pool: thread_pool,
             tx: tx,
-            writer: Arc::new(Mutex::new(Vec::new())),
+            writer: Arc::new(Mutex::new(Vec::with_capacity(1024))),
             closing: false,
             handle: handle,
         }
     }
 
     pub fn read(&mut self) {
-        let mut reader = Vec::new();
+        let mut reader = Vec::with_capacity(1024);
 
         loop {
             let mut buf = [0; 1024];
@@ -62,10 +62,10 @@ impl Connection {
                 Err(err) => {
                     if let WouldBlock = err.kind() {
                         break;
+                    } else {
+                        self.closing = true;
+                        return;
                     }
-
-                    self.closing = true;
-                    break;
                 }
             }
         }

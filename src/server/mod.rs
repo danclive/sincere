@@ -47,7 +47,7 @@ impl Server {
 
         Ok(Server {
             listener: TcpListener::bind(addr)?,
-            conns: HashMap::new(),
+            conns: HashMap::with_capacity(1024),
             token: 4,
             handle: Arc::new(Box::new(|_| {})),
             poll: Poll::new().unwrap(),
