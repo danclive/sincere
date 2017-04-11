@@ -16,9 +16,7 @@ use super::Handle;
 use super::stream::Stream;
 
 pub enum Event {
-    Close(Token),
     Write(Token),
-    Read(Token),
 }
 
 pub struct Connection {
@@ -26,7 +24,7 @@ pub struct Connection {
     token: Token,
     thread_pool: Pool,
     tx: channel::Sender<Event>,
-    writer: Arc<Mutex<Vec<u8>>>,
+    stream: Arc<Mutex<Stream>>,
     pub closing: bool,
     handle: Arc<Handle>,
 }
@@ -38,16 +36,18 @@ impl Connection {
             token: token,
             thread_pool: thread_pool,
             tx: tx,
-            writer: Arc::new(Mutex::new(Vec::with_capacity(1024))),
+            stream: Arc::new(Mutex::new(Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024)))),
             closing: false,
             handle: handle,
         }
     }
 
     pub fn read(&mut self) {
-        let mut reader = Vec::with_capacity(1024);
 
+        let mut stream = self.stream.lock().unwrap();
+        
         loop {
+
             let mut buf = [0; 1024];
 
             match self.socket.read(&mut buf) {
@@ -56,7 +56,7 @@ impl Connection {
                         self.closing = true;
                         return;
                     } else {
-                        reader.extend_from_slice(&buf[0..size]);
+                        stream.reader.extend_from_slice(&buf[0..size]);
                     }
                 },
                 Err(err) => {
@@ -68,35 +68,39 @@ impl Connection {
                     }
                 }
             }
+
         }
 
-        let writer = self.writer.clone();
+        stream.remote_addr = self.socket.peer_addr().unwrap();
 
         let tx = self.tx.clone();
         let token = self.token.clone();
 
         let handle = self.handle.clone();
 
-        let remote_addr = self.socket.peer_addr().unwrap();
+        let stream = self.stream.clone();
 
         self.thread_pool.spawn(move || {
-            handle(Stream::new(reader, writer, remote_addr));
+
+            handle(stream);
+
             tx.send(Event::Write(token)).is_ok();
         });
     }
 
     pub fn write(&mut self) {
-        let mut data = self.writer.lock().unwrap();
-
-        match self.socket.write(&data) {
+        let ref mut writer = self.stream.lock().unwrap().writer;
+        
+        match self.socket.write(writer) {
             Ok(_) => {
-                data.clear();
+                writer.clear();
             },
             Err(_) => {
                 self.closing = true;
                 return;
             }
         }
+
     }
 }
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::net::ToSocketAddrs;
 use std::io::{self, ErrorKind};
 use std::sync::mpsc::TryRecvError;
@@ -26,7 +26,7 @@ pub mod stream;
 const SERVER: Token = Token(0);
 const CHANNEL: Token = Token(1);
 
-pub type Handle = Box<Fn(Stream) + Send + Sync + 'static>;
+pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync + 'static>;
 
 pub struct Server {
     listener: TcpListener,
@@ -59,10 +59,6 @@ impl Server {
         })
     }
 
-    pub fn handle(&mut self, handle: Handle) {
-        self.handle = Arc::new(handle);
-    }
-
     fn token(&mut self) -> Token {
         self.token += 1;
         Token(self.token)
@@ -88,21 +84,11 @@ impl Server {
             match self.rx.try_recv() {
                 Ok(event) => {
                     match event {
-                        connection::Event::Close(token) => {
-                            if let Some(conn) = self.conns.remove(&token) {
-                                conn.deregister(&self.poll)?;
-                            }
-                        }, 
                         connection::Event::Write(token) => {
                             if let Some(conn) = self.conns.get(&token) {
                                 conn.reregister(&self.poll, token, Ready::writable(), PollOpt::edge() | PollOpt::oneshot())?;
                             }
                         },
-                        connection::Event::Read(token) => {
-                            if let Some(conn) = self.conns.get(&token) {
-                                conn.reregister(&self.poll, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
-                            }
-                        }
                     }
                 },
                 Err(err) => {

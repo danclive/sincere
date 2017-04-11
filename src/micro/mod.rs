@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use regex::Regex;
 
 use server::Server;
@@ -118,7 +120,7 @@ impl Micro {
         });
     }
 
-    pub fn handle(&self, stream: Stream) {
+    pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
         let mut http = Http::new(stream);
         let mut request = http.decode();
         let mut response = Response::empty(200);

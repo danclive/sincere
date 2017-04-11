@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io::Write;
+use std::sync::{Arc, Mutex};
 
 use server::Stream;
 
@@ -17,19 +18,20 @@ mod response;
 
 #[derive(Debug)]
 pub struct Http {
-    stream: Stream,
+    stream: Arc<Mutex<Stream>>,
 }
 
 impl Http {
-    pub fn new(stream: Stream) -> Http {
+    pub fn new(stream: Arc<Mutex<Stream>>) -> Http {
         Http {
             stream: stream,
         }
     }
 
     pub fn decode(&mut self) -> Request {
-          
-        let line = read_next_line(&mut self.stream);
+        let mut stream = self.stream.lock().unwrap();  
+        
+        let line = read_next_line(&mut stream);
         let mut words = line.trim().split(' ');
 
         let method = words.next();
@@ -43,7 +45,7 @@ impl Http {
         let mut headers: HashMap<String, String> = HashMap::new();
 
         loop {
-            let line = read_next_line(&mut self.stream);
+            let line = read_next_line(&mut stream);
 
             if line.len() == 0 {
                 break;
@@ -60,7 +62,7 @@ impl Http {
             headers.insert(key.to_owned(), value.to_owned());
         }
 
-        let remote_addr = self.stream.remote_addr();
+        let remote_addr = stream.remote_addr();
 
         Request::new(
             method.parse().unwrap(),
@@ -68,11 +70,13 @@ impl Http {
             version.to_owned(),
             headers,
             remote_addr,
-            self.stream.to_vec()
+            stream.to_vec()
         )
     }
 
     pub fn encode(&mut self, response: Response) {
+        let mut stream = self.stream.lock().unwrap();
+
         let mut data = Vec::new();
 
         write!(data, "HTTP/1.1 {} {}\r\n", response.status_code.0, response.status_code.default_reason_phrase()).unwrap();
@@ -89,8 +93,8 @@ impl Http {
 
         write!(data, "\r\n").unwrap();
 
-        self.stream.write(&data).unwrap();
-        self.stream.write(&response.data).unwrap();
+        stream.write(&data).unwrap();
+        stream.write(&response.data).unwrap();
     }
 }
 

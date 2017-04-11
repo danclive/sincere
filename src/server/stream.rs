@@ -1,24 +1,24 @@
-use std::sync::{Arc, Mutex};
 use std::io::Read;
 use std::io::Write;
 use std::io::Result as IoResult;
 use std::cmp;
 use std::net::SocketAddr;
 use std::mem;
+use std::str::FromStr;
 
 #[derive(Clone, Debug)]
 pub struct Stream {
-    reader: Vec<u8>,
-    writer: Arc<Mutex<Vec<u8>>>,
-    remote_addr: SocketAddr,
+    pub reader: Vec<u8>,
+    pub writer: Vec<u8>,
+    pub remote_addr: SocketAddr,
 }
 
 impl Stream {
-    pub fn new(reader: Vec<u8>, writer: Arc<Mutex<Vec<u8>>>, remote_addr: SocketAddr) -> Stream {
+    pub fn new(reader: Vec<u8>, writer: Vec<u8>) -> Stream {
         Stream {
             reader: reader,
             writer: writer,
-            remote_addr: remote_addr,
+            remote_addr: SocketAddr::from_str("0.0.0.0:0").unwrap(),
         }
     }
 
@@ -60,8 +60,7 @@ impl Read for Stream {
 impl Write for Stream {
     #[inline]
     fn write(&mut self, data: &[u8]) -> IoResult<usize> {
-        let mut writer = self.writer.lock().unwrap();
-        writer.write(data)
+        self.writer.write(data)
     }
 
     fn flush(&mut self) -> IoResult<()> {
