@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 use std::mem;
 use std::str::FromStr;
 
-#[derive(Clone, Debug)]
 pub struct Stream {
     pub reader: Vec<u8>,
     pub writer: Vec<u8>,

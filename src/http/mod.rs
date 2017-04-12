@@ -16,7 +16,6 @@ mod http_method;
 mod request;
 mod response;
 
-#[derive(Debug)]
 pub struct Http {
     stream: Arc<Mutex<Stream>>,
 }

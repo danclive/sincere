@@ -5,6 +5,8 @@ use std::net::ToSocketAddrs;
 use std::io::{self, ErrorKind};
 use std::sync::mpsc::TryRecvError;
 
+use rustls;
+
 use soio::Token;
 use soio::Poll;
 use soio::Ready;
@@ -39,6 +41,7 @@ pub struct Server {
     tx: Sender<connection::Event>,
     rx: Receiver<connection::Event>,
     run: bool,
+    tls_config: Option<Arc<rustls::ServerConfig>>,
 }
 
 impl Server {
@@ -56,6 +59,7 @@ impl Server {
             tx: tx,
             rx: rx,
             run: true,
+            tls_config: None,
         })
     }
 
@@ -74,7 +78,16 @@ impl Server {
         let handle = self.handle.clone();
 
         self.poll.register(&socket, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
-        self.conns.insert(token, Connection::new(socket, token, thread_pool, tx, handle));
+
+        match self.tls_config {
+            Some(ref tls_config) => {
+                let tls_session = rustls::ServerSession::new(tls_config);
+                self.conns.insert(token, Connection::new(socket, token, thread_pool, tx, handle, Some(tls_session)));
+            },
+            None => {
+                self.conns.insert(token, Connection::new(socket, token, thread_pool, tx, handle, None));
+            },
+        }
 
         Ok(())
     }
@@ -87,6 +100,16 @@ impl Server {
                         connection::Event::Write(token) => {
                             if let Some(conn) = self.conns.get(&token) {
                                 conn.reregister(&self.poll, token, Ready::writable(), PollOpt::edge() | PollOpt::oneshot())?;
+                            }
+                        },
+                        connection::Event::Read(token) => {
+                            if let Some(conn) = self.conns.get(&token) {
+                                conn.reregister(&self.poll, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
+                            }
+                        },
+                        connection::Event::WriteTls(token) => {
+                            if let Some(conn) = self.conns.get_mut(&token) {
+                                conn.write_to_tls();
                             }
                         },
                     }
@@ -114,7 +137,7 @@ impl Server {
             let mut close = false;
 
             if let Some(mut conn) = self.conns.get_mut(&token) {
-                conn.read();
+                conn.reader();
 
                 close = conn.closing;
             }
@@ -122,15 +145,16 @@ impl Server {
             if close {
                 if let Some(conn) = self.conns.remove(&token) {
                     conn.deregister(&self.poll)?;
+                    conn.shutdown();
                 }
-            }
+            } 
         }
 
         if event.readiness().is_writable() {
             let mut close = false;
 
             if let Some(mut conn) = self.conns.get_mut(&token) {
-                conn.write();
+                conn.writer();
 
                 close =  conn.closing;
             }
@@ -138,10 +162,7 @@ impl Server {
             if close {
                 if let Some(conn) = self.conns.remove(&token) {
                     conn.deregister(&self.poll)?;
-                }
-            } else {
-                if let Some(conn) = self.conns.get(&token) {
-                    conn.reregister(&self.poll, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
+                    conn.shutdown();
                 }
             }
         }
@@ -189,4 +210,51 @@ impl Server {
 
         Ok(())
     }
+
+    pub fn run_tls(&mut self, handle: Handle, cert: &str, private_key: &str) -> io::Result<()> {
+        self.tls_config = Some(make_config(cert, private_key));
+
+        self.handle = Arc::new(handle);
+
+        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::edge())?;
+
+        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::edge())?;
+
+        self.run = true;
+
+        while self.run {
+            self.run_once()?;
+        }
+
+        Ok(())
+    }
+}
+
+
+use std::fs;
+use std::io::BufReader;
+
+fn load_certs(filename: &str) -> Vec<rustls::Certificate> {
+    let certfile = fs::File::open(filename).expect("cannot open certificate file");
+    let mut reader = BufReader::new(certfile);
+    rustls::internal::pemfile::certs(&mut reader).unwrap()
+}
+
+fn load_private_key(filename: &str) -> rustls::PrivateKey {
+    let keyfile = fs::File::open(filename).expect("cannot open private key file");
+    let mut reader = BufReader::new(keyfile);
+    let keys = rustls::internal::pemfile::rsa_private_keys(&mut reader).unwrap();
+    assert!(keys.len() == 1);
+    keys[0].clone()
+}
+
+fn make_config(cert: &str, private_key: &str) -> Arc<rustls::ServerConfig> {
+    let cert = load_certs(cert);
+    let privkey = load_private_key(private_key);
+
+    let mut config = rustls::ServerConfig::new();
+    config.set_single_cert(cert, privkey);
+
+
+    Arc::new(config)
 }

@@ -8,3 +8,4 @@ soio = { path = "../soio" }
 threading = { path = "../threading" }
 chrono = "0.2"
 regex = "0.2"
+rustls = "0.5"
