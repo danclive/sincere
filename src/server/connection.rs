@@ -43,7 +43,7 @@ impl Connection {
             token: token,
             thread_pool: thread_pool,
             tx: tx,
-            stream: Arc::new(Mutex::new(Stream::new(Vec::new(), Vec::with_capacity(1024)))),
+            stream: Arc::new(Mutex::new(Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024)))),
             closing: false,
             handle: handle,
             tls_session: tls_session,
@@ -75,20 +75,16 @@ impl Connection {
                     return;
                 }
 
-                let mut buf = Vec::new();
+                let mut stream = self.stream.lock().unwrap();
 
-                if let Err(_) = tls_session.read_to_end(&mut buf) {
+                stream.remote_addr = self.socket.peer_addr().unwrap();
+
+                if let Err(_) = tls_session.read_to_end(&mut stream.reader) {
                     self.closing = true;
                     return;
                 }
 
-                if !buf.is_empty() {
-                   
-                    let mut stream = self.stream.lock().unwrap();
-
-                    stream.reader = buf;
-
-                    stream.remote_addr = self.socket.peer_addr().unwrap();
+                if stream.len() != 0 {
 
                     let tx = self.tx.clone();
                     let token = self.token.clone();
