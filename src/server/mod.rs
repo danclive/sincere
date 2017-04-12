@@ -127,9 +127,14 @@ impl Server {
     }
 
     fn connect(&mut self, event: Event ,token: Token) -> io::Result<()> {
+        println!("{:?}", event);
+
         if event.readiness().is_hup() || event.readiness().is_error() {
             if let Some(conn) = self.conns.remove(&token) {
                 conn.deregister(&self.poll)?;
+                conn.shutdown();
+
+                return Ok(())
             }
         }
 

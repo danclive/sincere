@@ -170,10 +170,18 @@ impl Connection {
     pub fn writer(&mut self) {
         match self.tls_session {
             Some(ref mut tls_session) => {
-
-                if let Err(_) = tls_session.write_tls(&mut self.socket) {
-                    self.closing = true;
-                    return;
+                match tls_session.write_tls(&mut self.socket) {
+                    Ok(size) => {
+                        println!("{:?}", size);
+                        if size == 0 {
+                            self.closing = true;
+                            return;
+                        }
+                    },
+                    Err(_) => {
+                        self.closing = true;
+                        return;
+                    }
                 }
 
                 let rd = tls_session.wants_read();
@@ -192,7 +200,12 @@ impl Connection {
                 let ref mut writer = self.stream.lock().unwrap().writer;
         
                 match self.socket.write(writer) {
-                    Ok(_) => {
+                    Ok(size) => {
+                        if size == 0 {
+                            self.closing = true;
+                            return;
+                        }
+
                         writer.clear();
                     },
                     Err(_) => {
