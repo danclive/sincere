@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::io::{self, Read, Write};
 use std::io::ErrorKind::WouldBlock;
 use std::net::Shutdown;
+use std::rc::Rc;
 
 use rustls;
 use rustls::Session;
@@ -28,7 +29,7 @@ pub enum Event {
 pub struct Connection {
     socket: TcpStream,
     token: Token,
-    thread_pool: Pool,
+    thread_pool: Rc<Pool>,
     tx: channel::Sender<Event>,
     stream: Arc<Mutex<Stream>>,
     pub closing: bool,
@@ -37,7 +38,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(socket: TcpStream, token: Token, thread_pool: Pool, tx: channel::Sender<Event>, handle: Arc<Handle>, tls_session: Option<rustls::ServerSession>) -> Connection {
+    pub fn new(socket: TcpStream, token: Token, thread_pool: Rc<Pool>, tx: channel::Sender<Event>, handle: Arc<Handle>, tls_session: Option<rustls::ServerSession>) -> Connection {
         Connection {
             socket: socket,
             token: token,
@@ -58,6 +59,7 @@ impl Connection {
                     Ok(size) => {
                         if size == 0 {
                             self.closing = true;
+                            return;
                         }
                     },
                     Err(err) => {
@@ -163,6 +165,7 @@ impl Connection {
 
                 });
 
+
             },
         }
     }
@@ -172,7 +175,6 @@ impl Connection {
             Some(ref mut tls_session) => {
                 match tls_session.write_tls(&mut self.socket) {
                     Ok(size) => {
-                        println!("{:?}", size);
                         if size == 0 {
                             self.closing = true;
                             return;

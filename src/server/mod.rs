@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::net::ToSocketAddrs;
 use std::io::{self, ErrorKind};
 use std::sync::mpsc::TryRecvError;
+use std::rc::Rc;
 
 use rustls;
 
@@ -37,7 +38,7 @@ pub struct Server {
     handle: Arc<Handle>,
     poll: Poll,
     events: Events,
-    thread_pool: Pool,
+    thread_pool: Rc<Pool>,
     tx: Sender<connection::Event>,
     rx: Receiver<connection::Event>,
     run: bool,
@@ -55,7 +56,7 @@ impl Server {
             handle: Arc::new(Box::new(|_| {})),
             poll: Poll::new().unwrap(),
             events: Events::with_capacity(1024),
-            thread_pool: Pool::new(),
+            thread_pool: Rc::new(Pool::new()),
             tx: tx,
             rx: rx,
             run: true,
@@ -127,9 +128,9 @@ impl Server {
     }
 
     fn connect(&mut self, event: Event ,token: Token) -> io::Result<()> {
-        println!("{:?}", event);
 
         if event.readiness().is_hup() || event.readiness().is_error() {
+
             if let Some(conn) = self.conns.remove(&token) {
                 conn.deregister(&self.poll)?;
                 conn.shutdown();
@@ -143,15 +144,14 @@ impl Server {
 
             if let Some(mut conn) = self.conns.get_mut(&token) {
                 conn.reader();
-
                 close = conn.closing;
             }
 
-            if close {
+            if close {             
                 if let Some(conn) = self.conns.remove(&token) {
                     conn.deregister(&self.poll)?;
                     conn.shutdown();
-                }
+                }             
             } 
         }
 
