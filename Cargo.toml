@@ -4,8 +4,8 @@ version = "0.2.0"
 authors = ["dangcheng <dangcheng@hotmail.com>"]
 
 [dependencies]
-soio = { path = "../soio" }
-threading = { path = "../threading" }
+soio = { git="https://github.com/mcorce/soio.git" }
+threading = { git="https://github.com/mcorce/threading.git" }
 chrono = "0.2"
 regex = "0.2"
 rustls = "0.5"
