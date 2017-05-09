@@ -209,6 +209,14 @@ impl Micro {
             self.handle(stream);
         })).unwrap();
     }
+
+    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) {
+        let mut server = Server::new(addr).unwrap();
+
+        server.run_tls(Box::new(move |stream| {
+            self.handle(stream);
+        }), cert, private_key).unwrap();
+    }
 }
 
 struct Middleware {
