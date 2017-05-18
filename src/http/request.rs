@@ -56,8 +56,8 @@ impl Request {
         self.data.len()
     }
 
-    pub fn data(&self) -> &Vec<u8> {
-        &self.data
+    pub fn data(&mut self) -> &mut Vec<u8> {
+        &mut self.data
     }
 
     pub fn params(&mut self) -> &mut HashMap<String, String> {
