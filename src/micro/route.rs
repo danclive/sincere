@@ -7,11 +7,11 @@ use http::Response;
 use super::Handle;
 
 pub struct Route {
-    pub pattern: String,
-    pub method: Method,
-    pub handle: Box<Handle>,
-    pub compilied_pattern: String,
-    pub paths: HashMap<String, usize>,
+    pattern: String,
+    method: Method,
+    handle: Box<Handle>,
+    compilied_pattern: String,
+    paths: HashMap<String, usize>,
 }
 
 impl Route {
@@ -29,9 +29,29 @@ impl Route {
         route
     }
 
+    pub fn pattern(&self) -> &String {
+        &self.pattern
+    }
+
+    pub fn method(&self) -> &Method {
+        &self.method
+    }
+
+    pub fn compilied_pattern(&self) -> String {
+        self.compilied_pattern.clone()
+    }
+
     pub fn name(&mut self, name: &str) {
         println!("{:?}", name);
         println!("{:?}", self.method);
+    }
+
+    pub fn path(&self) -> HashMap<String, usize> {
+        self.paths.clone()
+    }
+
+    pub fn execute(&self, request: &mut Request, response: &mut Response) {
+        (self.handle)(request, response);
     }
 
     fn re_connfigure(&mut self, pattern: String) {
@@ -68,7 +88,7 @@ impl Group {
     {
         let route = Route::new(
             method.parse().unwrap(), 
-            self.prefix.clone() + pattern, 
+            self.prefix.clone() + pattern,
             Box::new(handle),
         );
 
