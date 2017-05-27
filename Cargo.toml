@@ -4,7 +4,7 @@ version = "0.2.1"
 authors = ["dangcheng <dangcheng@hotmail.com>"]
 
 [dependencies]
-soio = { git="https://github.com/mcorce/soio.git" }
+soio = "0.2"
 threading = "0.1"
 chrono = "0.3"
 regex = "0.2"
