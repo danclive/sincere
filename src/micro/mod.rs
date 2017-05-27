@@ -18,6 +18,7 @@ pub type Handle = Fn(&mut Request, &mut Response) + Send + Sync + 'static;
 
 pub struct Micro {
     routes: Vec<Route>,
+    begin: Vec<Middleware>,
     before: Vec<Middleware>,
     after: Vec<Middleware>,
     finish: Vec<Middleware>,
@@ -28,6 +29,7 @@ impl Micro {
     pub fn new() -> Micro {
         Micro {
             routes: Vec::new(),
+            begin: Vec::new(),
             before: Vec::new(),
             after: Vec::new(),
             finish: Vec::new(),
@@ -88,6 +90,14 @@ impl Micro {
         self.routes.append(group.routes.as_mut());
     }
 
+    pub fn begin<H>(&mut self, handle: H)
+        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+    {
+        self.begin.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
     pub fn before<H>(&mut self, handle: H)
         where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
@@ -122,13 +132,18 @@ impl Micro {
 
     pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
         let mut http = Http::new(stream);
+        
         let mut request = http.decode();
         let mut response = Response::empty(200);
 
         let mut route_found = false;
 
-        for route in &self.routes {
-            if route.method != *request.method() {
+        for begin in self.begin.iter() {         
+            begin.execute(&mut request, &mut response);
+        }
+
+        for route in self.routes.iter() {
+            if route.method() != request.method() {
                 continue;
             }
 
@@ -143,7 +158,7 @@ impl Micro {
             };
 
             let pattern = {
-                let pattern = route.compilied_pattern.clone();
+                let pattern = route.compilied_pattern();
                 if pattern != "/" {
                     pattern.trim_right_matches('/').to_owned()
                 } else {
@@ -158,7 +173,7 @@ impl Micro {
                 if let Some(caps) = caps {
                     route_found = true;
 
-                    let matches = route.paths.clone();
+                    let matches = route.path();
 
                     for (key, value) in matches.iter() {
                         request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
@@ -172,13 +187,15 @@ impl Micro {
 
             if route_found {
                 
-                for before in &self.before {
+                for before in self.before.iter() {
                     before.execute(&mut request, &mut response);
                 }
 
-                route.handle.as_ref()(&mut request, &mut response);
+                if !response.is_stop() {
+                    route.execute(&mut request, &mut response);
+                }
 
-                for after in &self.after {
+                for after in self.after.iter() {
                     after.execute(&mut request, &mut response);
                 }
 
@@ -194,7 +211,7 @@ impl Micro {
             }
         }
 
-        for finish in &self.finish {
+        for finish in self.finish.iter() {
             finish.execute(&mut request, &mut response);
         }
 
@@ -225,6 +242,6 @@ struct Middleware {
 
 impl Middleware {
     fn execute(&self, request: &mut Request, response: &mut Response) {
-        self.inner.as_ref()(request, response);
+        (self.inner)(request, response);
     }
 }
