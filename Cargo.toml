@@ -1,7 +1,14 @@
 [package]
 name = "sincere"
-version = "0.2.1"
-authors = ["dangcheng <dangcheng@hotmail.com>"]
+version       = "0.2.1"
+license       = "MIT"
+authors       = ["dangcheng <dangcheng@hotmail.com>"]
+description   = "web framework"
+documentation = "https://docs.rs/sincere"
+homepage      = "https://github.com/mcorce/sincere"
+repository    = "https://github.com/mcorce/sincere"
+readme        = "README.md"
+keywords      = ["web", "api"]
 
 [dependencies]
 soio = "0.2"
