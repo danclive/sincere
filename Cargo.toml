@@ -1,5 +1,5 @@
 [package]
-name = "sincere"
+name          = "sincere"
 version       = "0.2.1"
 license       = "MIT"
 authors       = ["dangcheng <dangcheng@hotmail.com>"]
@@ -9,10 +9,16 @@ homepage      = "https://github.com/mcorce/sincere"
 repository    = "https://github.com/mcorce/sincere"
 readme        = "README.md"
 keywords      = ["web", "api"]
+exclude       = [
+  ".gitignore",
+  ".travis.yml",
+  "deploy.sh",
+  "test/**/*",
+]
 
 [dependencies]
 soio = "0.2"
 threading = "0.1"
 chrono = "0.3"
 regex = "0.2"
-rustls = "0.5"
+rustls = "0.8"
