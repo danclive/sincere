@@ -15,3 +15,4 @@ pub mod server;
 pub mod http;
 pub mod micro;
 pub mod util;
+pub mod error;

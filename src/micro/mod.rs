@@ -11,6 +11,7 @@ use http::Response;
 
 use self::route::Route;
 pub use self::route::Group;
+use error::Result;
 
 mod route;
 
@@ -218,21 +219,25 @@ impl Micro {
         http.encode(response);
     }
 
-    pub fn run(self, addr: &str) {
+    pub fn run(self, addr: &str) -> Result<()> {
 
         let mut server = Server::new(addr).unwrap();
 
         server.run(Box::new(move |stream| {
             self.handle(stream);
-        })).unwrap();
+        }))?;
+
+        Ok(())
     }
 
-    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) {
+    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
         let mut server = Server::new(addr).unwrap();
 
         server.run_tls(Box::new(move |stream| {
             self.handle(stream);
-        }), cert, private_key).unwrap();
+        }), cert, private_key)?;
+
+        Ok(())
     }
 }
 

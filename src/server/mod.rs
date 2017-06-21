@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::net::ToSocketAddrs;
 use std::io::{self, ErrorKind};
@@ -22,6 +21,7 @@ use threading::Pool;
 
 use self::connection::Connection;
 pub use self::stream::Stream;
+use error::Result;
 
 pub mod connection;
 pub mod stream;
@@ -46,7 +46,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new<A: ToSocketAddrs>(addr: A) -> Result<Server, Box<Error + Send + Sync>> {
+    pub fn new<A: ToSocketAddrs>(addr: A) -> Result<Server> {
         let (tx, rx) = channel::channel::<connection::Event>();
 
         Ok(Server {
@@ -69,7 +69,7 @@ impl Server {
         Token(self.token)
     }
 
-    fn accept(&mut self) -> io::Result<()> {
+    fn accept(&mut self) -> Result<()> {
         let (socket, _) = self.listener.accept()?;
 
         let thread_pool = self.thread_pool.clone();
@@ -93,7 +93,7 @@ impl Server {
         Ok(())
     }
 
-    fn channel(&mut self) -> io::Result<()> {
+    fn channel(&mut self) -> Result<()> {
         loop {
             match self.rx.try_recv() {
                 Ok(event) => {
@@ -118,7 +118,7 @@ impl Server {
                 Err(err) => {
                     match err {
                         TryRecvError::Empty => break,
-                        TryRecvError::Disconnected => return Err(io::Error::new(ErrorKind::ConnectionAborted, err)),
+                        TryRecvError::Disconnected => return Err(io::Error::new(ErrorKind::ConnectionAborted, err).into()),
                     }
                 }
             }
@@ -127,7 +127,7 @@ impl Server {
         Ok(())
     }
 
-    fn connect(&mut self, event: Event ,token: Token) -> io::Result<()> {
+    fn connect(&mut self, event: Event ,token: Token) -> Result<()> {
 
         if event.readiness().is_hup() || event.readiness().is_error() {
 
@@ -175,7 +175,7 @@ impl Server {
         Ok(())
     }
 
-    pub fn event(&mut self, event: Event) -> io::Result<()> {
+    pub fn event(&mut self, event: Event) -> Result<()> {
         match event.token() {
             SERVER => {
                 self.accept()
@@ -189,7 +189,7 @@ impl Server {
         }
     }
 
-    pub fn run_once(&mut self) -> io::Result<()> {
+    pub fn run_once(&mut self) -> Result<()> {
         let size = self.poll.poll(&mut self.events, None)?;
 
         for i in 0..size {
@@ -200,7 +200,7 @@ impl Server {
         Ok(())
     }
 
-    pub fn run(&mut self, handle: Handle) -> io::Result<()> {
+    pub fn run(&mut self, handle: Handle) -> Result<()> {
         self.handle = Arc::new(handle);
 
         self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::edge())?;
@@ -216,7 +216,7 @@ impl Server {
         Ok(())
     }
 
-    pub fn run_tls(&mut self, handle: Handle, cert: &str, private_key: &str) -> io::Result<()> {
+    pub fn run_tls(&mut self, handle: Handle, cert: &str, private_key: &str) -> Result<()> {
         self.tls_config = Some(make_config(cert, private_key));
 
         self.handle = Arc::new(handle);
