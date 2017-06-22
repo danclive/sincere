@@ -70,6 +70,7 @@ impl Server {
     }
 
     fn accept(&mut self) -> Result<()> {
+        println!("accept");
         let (socket, _) = self.listener.accept()?;
 
         let thread_pool = self.thread_pool.clone();
@@ -100,12 +101,12 @@ impl Server {
                     match event {
                         connection::Event::Write(token) => {
                             if let Some(conn) = self.conns.get(&token) {
-                                conn.reregister(&self.poll, token, Ready::writable(), PollOpt::edge() | PollOpt::oneshot())?;
+                                conn.reregister(&self.poll, token, Ready::writable() | Ready::hup(), PollOpt::edge() | PollOpt::oneshot())?;
                             }
                         },
                         connection::Event::Read(token) => {
                             if let Some(conn) = self.conns.get(&token) {
-                                conn.reregister(&self.poll, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
+                                conn.reregister(&self.poll, token, Ready::readable() | Ready::hup(), PollOpt::edge() | PollOpt::oneshot())?;
                             }
                         },
                         connection::Event::WriteTls(token) => {
@@ -129,12 +130,9 @@ impl Server {
 
     fn connect(&mut self, event: Event ,token: Token) -> Result<()> {
 
-        if event.readiness().is_hup() || event.readiness().is_error() {
-
-            if let Some(conn) = self.conns.remove(&token) {
-                conn.deregister(&self.poll)?;
-                conn.shutdown();
-
+        if event.readiness().is_error() {
+           if let Some(conn) = self.conns.remove(&token) {
+               conn.deregister(&self.poll)?;
                 return Ok(())
             }
         }
