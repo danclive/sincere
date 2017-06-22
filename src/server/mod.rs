@@ -70,7 +70,6 @@ impl Server {
     }
 
     fn accept(&mut self) -> Result<()> {
-        println!("accept");
         let (socket, _) = self.listener.accept()?;
 
         let thread_pool = self.thread_pool.clone();
