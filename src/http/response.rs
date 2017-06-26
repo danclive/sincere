@@ -9,7 +9,6 @@ pub struct Response {
     pub headers: HashMap<String, String>,
     pub data_length: Option<usize>,
     pub data: Vec<u8>,
-    stop: bool
 }
 
 impl Response {
@@ -19,7 +18,6 @@ impl Response {
             headers: headers,
             data_length: data_length,
             data: data,
-            stop: false
         }
     }
 
@@ -98,13 +96,5 @@ impl Response {
     {
         self.headers.insert(header.0.into(), header.1.into());
         self
-    }
-
-    pub fn is_stop(&self) -> bool {
-        self.stop
-    }
-
-    pub fn stop(&mut self) {
-        self.stop = true
     }
 }

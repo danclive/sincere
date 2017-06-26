@@ -160,7 +160,6 @@ impl Server {
 
             if let Some(mut conn) = self.conns.get_mut(&token) {
                 conn.writer();
-
                 close =  conn.closing;
             }
 

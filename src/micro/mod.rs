@@ -18,7 +18,7 @@ mod route;
 pub type Handle = Fn(&mut Request, &mut Response) + Send + Sync + 'static;
 
 pub struct Micro {
-    routes: Vec<Route>,
+    groups: Vec<Group>,
     begin: Vec<Middleware>,
     before: Vec<Middleware>,
     after: Vec<Middleware>,
@@ -29,7 +29,7 @@ pub struct Micro {
 impl Micro {
     pub fn new() -> Micro {
         Micro {
-            routes: Vec::new(),
+            groups: vec![Group::new("")],
             begin: Vec::new(),
             before: Vec::new(),
             after: Vec::new(),
@@ -47,8 +47,8 @@ impl Micro {
             Box::new(handle),
         );
 
-        self.routes.push(route);
-        self.routes.last_mut().unwrap()
+        self.groups.get_mut(0).unwrap().routes.push(route);
+        self.groups.get_mut(0).unwrap().routes.last_mut().unwrap()
     }
 
     pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
@@ -87,8 +87,8 @@ impl Micro {
         self.add("HEAD", pattern, handle)
     }
 
-    pub fn mount(&mut self, mut group: Group) {
-        self.routes.append(group.routes.as_mut());
+    pub fn mount(&mut self, group: Group) {
+        self.groups.push(group)
     }
 
     pub fn begin<H>(&mut self, handle: H)
@@ -132,8 +132,10 @@ impl Micro {
     }
 
     pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
+        println!("{:?}", self.groups.len());
+
         let mut http = Http::new(stream);
-        
+
         let mut request = http.decode();
         let mut response = Response::empty(200);
 
@@ -143,64 +145,66 @@ impl Micro {
             begin.execute(&mut request, &mut response);
         }
 
-        for route in self.routes.iter() {
-            if route.method() != request.method() {
-                continue;
-            }
+        'outer: for group in self.groups.iter() {
 
-            let path = {
-                let path = request.path();
-                let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
-                if path != "/" {
-                    path.trim_right_matches('/').to_owned()
-                } else {
-                    path.to_owned()
+            for route in group.routes.iter() {
+
+                if route.method() != request.method() {
+                    continue;
                 }
-            };
 
-            let pattern = {
-                let pattern = route.compilied_pattern();
-                if pattern != "/" {
-                    pattern.trim_right_matches('/').to_owned()
+                let path = {
+                    let path = request.path();
+                    let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
+                    if path != "/" {
+                        path.trim_right_matches('/').to_owned()
+                    } else {
+                        path.to_owned()
+                    }
+                };
+
+                let pattern = {
+                    let pattern = route.compilied_pattern();
+                    if pattern != "/" {
+                        pattern.trim_right_matches('/').to_owned()
+                    } else {
+                        pattern
+                    }
+                };
+
+                if pattern.contains("^") {
+                    let re = Regex::new(&pattern).unwrap();
+                    let caps = re.captures(&path);
+
+                    if let Some(caps) = caps {
+                        route_found = true;
+
+                        let matches = route.path();
+
+                        for (key, value) in matches.iter() {
+                            request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                        }
+                    }
                 } else {
-                    pattern
-                }
-            };
-
-            if pattern.contains("^") {
-                let re = Regex::new(&pattern).unwrap();
-                let caps = re.captures(&path);
-
-                if let Some(caps) = caps {
-                    route_found = true;
-
-                    let matches = route.path();
-
-                    for (key, value) in matches.iter() {
-                        request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                    if pattern == path {
+                        route_found = true;
                     }
                 }
-            } else {
-                if pattern == path {
-                    route_found = true;
-                }
-            }
 
-            if route_found {
-                
-                for before in self.before.iter() {
-                    before.execute(&mut request, &mut response);
-                }
+                if route_found {
+                    
+                    for before in self.before.iter() {
+                        before.execute(&mut request, &mut response);
+                    }
 
-                if !response.is_stop() {
                     route.execute(&mut request, &mut response);
-                }
 
-                for after in self.after.iter() {
-                    after.execute(&mut request, &mut response);
-                }
+                    for after in self.after.iter() {
+                        after.execute(&mut request, &mut response);
+                    }
 
-                break;
+                    break 'outer;
+                }
             }
         }
 

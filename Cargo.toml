@@ -1,6 +1,6 @@
 [package]
 name          = "sincere"
-version       = "0.2.2"
+version       = "0.2.4"
 license       = "MIT"
 authors       = ["dangcheng <dangcheng@hotmail.com>"]
 description   = "web framework"
@@ -21,4 +21,4 @@ soio = "0.2"
 threading = "0.1"
 chrono = "0.3"
 regex = "0.2"
-rustls = "0.8"
+rustls = "0.9"

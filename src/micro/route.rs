@@ -83,6 +83,7 @@ impl Group {
             prefix: prefix.to_owned(),
         }
     }
+
     fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
         where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
     {
