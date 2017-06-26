@@ -78,15 +78,25 @@ impl Server {
 
         let handle = self.handle.clone();
 
-        self.poll.register(&socket, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
+        self.poll.register(
+            &socket, token,
+            Ready::readable() | Ready::hup(),
+            PollOpt::edge() | PollOpt::oneshot()
+        )?;
 
         match self.tls_config {
             Some(ref tls_config) => {
                 let tls_session = rustls::ServerSession::new(tls_config);
-                self.conns.insert(token, Connection::new(socket, token, thread_pool, tx, handle, Some(tls_session)));
+                self.conns.insert(
+                    token,
+                    Connection::new(socket, token, thread_pool, tx, handle, Some(tls_session))
+                );
             },
             None => {
-                self.conns.insert(token, Connection::new(socket, token, thread_pool, tx, handle, None));
+                self.conns.insert(
+                    token,
+                    Connection::new(socket, token, thread_pool, tx, handle, None)
+                );
             },
         }
 
@@ -100,12 +110,20 @@ impl Server {
                     match event {
                         connection::Event::Write(token) => {
                             if let Some(conn) = self.conns.get(&token) {
-                                conn.reregister(&self.poll, token, Ready::writable(), PollOpt::edge() | PollOpt::oneshot())?;
+                                conn.reregister(
+                                    &self.poll, token,
+                                    Ready::writable() | Ready::hup(),
+                                    PollOpt::edge() | PollOpt::oneshot()
+                                )?;
                             }
                         },
                         connection::Event::Read(token) => {
                             if let Some(conn) = self.conns.get(&token) {
-                                conn.reregister(&self.poll, token, Ready::readable(), PollOpt::edge() | PollOpt::oneshot())?;
+                                conn.reregister(
+                                    &self.poll, token,
+                                    Ready::readable() | Ready::hup(),
+                                    PollOpt::edge() | PollOpt::oneshot()
+                                )?;
                             }
                         },
                         connection::Event::WriteTls(token) => {
@@ -118,7 +136,9 @@ impl Server {
                 Err(err) => {
                     match err {
                         TryRecvError::Empty => break,
-                        TryRecvError::Disconnected => return Err(io::Error::new(ErrorKind::ConnectionAborted, err).into()),
+                        TryRecvError::Disconnected => return Err(
+                            io::Error::new(ErrorKind::ConnectionAborted, err).into()
+                        ),
                     }
                 }
             }
@@ -129,12 +149,9 @@ impl Server {
 
     fn connect(&mut self, event: Event ,token: Token) -> Result<()> {
 
-        if event.readiness().is_hup() || event.readiness().is_error() {
-
-            if let Some(conn) = self.conns.remove(&token) {
-                conn.deregister(&self.poll)?;
-                conn.shutdown();
-
+        if event.readiness().is_error() {
+           if let Some(conn) = self.conns.remove(&token) {
+               conn.deregister(&self.poll)?;
                 return Ok(())
             }
         }
@@ -202,9 +219,9 @@ impl Server {
     pub fn run(&mut self, handle: Handle) -> Result<()> {
         self.handle = Arc::new(handle);
 
-        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::edge())?;
+        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::level())?;
 
-        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::edge())?;
+        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::level())?;
 
         self.run = true;
 
@@ -220,9 +237,9 @@ impl Server {
 
         self.handle = Arc::new(handle);
 
-        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::edge())?;
+        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::level())?;
 
-        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::edge())?;
+        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::level())?;
 
         self.run = true;
 

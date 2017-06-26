@@ -122,7 +122,7 @@ impl Connection {
             None => {
 
                 let mut stream = self.stream.lock().unwrap();
-                
+
                 loop {
 
                     let mut buf = [0; 1024];
@@ -134,6 +134,10 @@ impl Connection {
                                 return;
                             } else {
                                 stream.reader.extend_from_slice(&buf[0..size]);
+
+                                if size < 1024 {
+                                    break;
+                                }
                             }
                         },
                         Err(err) => {
