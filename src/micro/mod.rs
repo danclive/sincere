@@ -132,7 +132,6 @@ impl Micro {
     }
 
     pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
-        println!("{:?}", self.groups.len());
 
         let mut http = Http::new(stream);
 
