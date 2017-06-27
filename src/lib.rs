@@ -10,6 +10,7 @@ pub use http::Request;
 pub use http::Response;
 pub use micro::Micro;
 pub use micro::Group;
+pub use error::Error;
 
 pub mod server;
 pub mod http;
