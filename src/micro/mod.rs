@@ -211,7 +211,7 @@ impl Micro {
             if let Some(ref not_found) = self.not_found {
                 not_found.execute(&mut request, &mut response);
             } else {
-                response.status(404).from_text("Not Found");
+                response.status(404).from_text("Not Found").unwrap();
             }
         }
 

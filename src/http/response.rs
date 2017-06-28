@@ -2,8 +2,13 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 
-use super::http_code::StatusCode;
+use serde::Serialize;
+use serde_json;
 
+use super::http_code::StatusCode;
+use error::Result;
+
+#[derive(Debug)]
 pub struct Response {
     pub status_code: StatusCode,
     pub headers: HashMap<String, String>,
@@ -32,7 +37,7 @@ impl Response {
         )
     }
 
-    pub fn from_data<C, D>(&mut self, content_type: C,data: D) -> &mut Response
+    pub fn from_data<C, D>(&mut self, content_type: C,data: D) -> Result<&mut Response>
         where C: Into<String>, D: Into<Vec<u8>>
     {
         let data = data.into();
@@ -42,25 +47,25 @@ impl Response {
 
         self.data_length = Some(data_len);
         self.data = data;
-        self
+        Ok(self)
     }
 
-    pub fn from_file<C>(&mut self, content_type: C, mut file: File) -> &mut Response
+    pub fn from_file<C>(&mut self, content_type: C, mut file: File) -> Result<&mut Response>
         where C: Into<String>
     {
         let file_size = file.metadata().ok().map(|v| v.len() as usize);
 
         let mut data: Vec<u8> = Vec::new();
-        file.read_to_end(&mut data).unwrap();
+        file.read_to_end(&mut data)?;
 
         self.headers.insert("Content-Type".to_owned(), content_type.into());
 
         self.data_length = file_size;
         self.data = data;
-        self
+        Ok(self)
     }
 
-    pub fn from_text<S>(&mut self, string: S) -> &mut Response
+    pub fn from_text<S>(&mut self, string: S) -> Result<&mut Response>
         where S: Into<String>
     {
         let string = string.into();
@@ -70,10 +75,10 @@ impl Response {
 
         self.data_length = Some(data_len);
         self.data = string.into();
-        self
+        Ok(self)
     }
 
-    pub fn from_html<S>(&mut self, string: S) -> &mut Response
+    pub fn from_html<S>(&mut self, string: S) -> Result<&mut Response>
         where S: Into<String>
     {
         let string = string.into();
@@ -83,7 +88,19 @@ impl Response {
 
         self.data_length = Some(data_len);
         self.data = string.into();
-        self
+        Ok(self)
+    }
+
+    pub fn from_json<S: Serialize>(&mut self, value: S) -> Result<&mut Response> {
+        let data = serde_json::to_vec(&value)?;
+        let data_len = data.len();
+
+        self.headers.insert("Content-Type".to_owned(), "application/json; charset=UTF-8".to_owned());
+
+        self.data_length = Some(data_len);
+        self.data = data;
+
+        Ok(self)
     }
 
     pub fn status(&mut self, code: u16) -> &mut Response {

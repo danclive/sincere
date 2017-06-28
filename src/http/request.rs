@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
+use serde::de::DeserializeOwned;
+use serde_json;
+
 use super::http_method::Method;
+use error::Result;
 
 pub struct Request {
     method: Method,
@@ -68,5 +72,9 @@ impl Request {
         where S: Into<&'a str>
     {
         self.params.get(key.into()).map(|v| v.to_string())
+    }
+
+    pub fn bind_json<D: DeserializeOwned>(&self) -> Result<D> {
+        Ok(serde_json::from_slice(&self.data)?)
     }
 }
