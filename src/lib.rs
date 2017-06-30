@@ -5,6 +5,7 @@ extern crate regex;
 extern crate rustls;
 extern crate serde;
 extern crate serde_json;
+extern crate serde_urlencoded;
 
 pub use server::Server;
 pub use http::Http;

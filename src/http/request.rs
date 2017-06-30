@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 
 use serde::de::DeserializeOwned;
 use serde_json;
+use serde_urlencoded;
 
 use super::http_method::Method;
 use error::Result;
@@ -13,6 +14,7 @@ pub struct Request {
     version: String,
     headers: HashMap<String, String>,
     params: HashMap<String, String>,
+    querys: HashMap<String, String>,
     remote_addr: SocketAddr,
     data: Vec<u8>,
 }
@@ -25,6 +27,7 @@ impl Request {
             version: version,
             headers: headers,
             params: HashMap::new(),
+            querys: HashMap::new(),
             remote_addr: remote_addr,
             data: data,
         }
@@ -74,7 +77,40 @@ impl Request {
         self.params.get(key.into()).map(|v| v.to_string())
     }
 
+    fn decode_query(&mut self) {
+        if self.querys.len() == 0 {
+            let url: String = self.path.find('?').map_or("".to_owned(), |pos| self.path[pos + 1..].to_owned());
+            self.querys = serde_urlencoded::from_str::<HashMap<String, String>>(&url).unwrap();
+        }
+    }
+
+    pub fn querys(&mut self) -> &mut HashMap<String, String> {
+        self.decode_query();
+
+        &mut self.querys
+    }
+
+    pub fn get_query<'a, S>(&mut self, key: S) -> Option<String>
+        where S: Into<&'a str>
+    {
+        self.decode_query();
+
+        self.querys.get(key.into()).map(|v| v.to_string())
+    }
+
     pub fn bind_json<D: DeserializeOwned>(&self) -> Result<D> {
         Ok(serde_json::from_slice(&self.data)?)
     }
 }
+
+/*
+trait VecFind {
+    fn find(&self, key: &str) -> Option<&str>;
+}
+
+impl VecFind for Vec<(String, String)> {
+    fn find(&self, key: &str) -> Option<&str> {
+        self.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| &**v)
+    }
+}
+*/
