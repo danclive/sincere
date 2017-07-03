@@ -3,9 +3,9 @@ use std::net::SocketAddr;
 
 use serde::de::DeserializeOwned;
 use serde_json;
-use serde_urlencoded;
 
 use super::http_method::Method;
+use util::url;
 use error::Result;
 
 pub struct Request {
@@ -80,7 +80,7 @@ impl Request {
     fn decode_query(&mut self) {
         if self.querys.len() == 0 {
             let url: String = self.path.find('?').map_or("".to_owned(), |pos| self.path[pos + 1..].to_owned());
-            self.querys = serde_urlencoded::from_str::<HashMap<String, String>>(&url).unwrap();
+            self.querys = url::from_str::<HashMap<String, String>>(&url).unwrap();
         }
     }
 

@@ -3,9 +3,10 @@ extern crate threading;
 extern crate chrono;
 extern crate regex;
 extern crate rustls;
+#[macro_use]
 extern crate serde;
 extern crate serde_json;
-extern crate serde_urlencoded;
+extern crate url;
 
 pub use server::Server;
 pub use http::Http;
