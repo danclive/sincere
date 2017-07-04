@@ -80,7 +80,9 @@ impl Request {
     fn decode_query(&mut self) {
         if self.querys.len() == 0 {
             let url: String = self.path.find('?').map_or("".to_owned(), |pos| self.path[pos + 1..].to_owned());
-            self.querys = url::from_str::<HashMap<String, String>>(&url).unwrap();
+            if url.len() > 0 {
+                self.querys = url::from_str::<HashMap<String, String>>(&url).unwrap();
+            }
         }
     }
 
