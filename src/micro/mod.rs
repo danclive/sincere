@@ -222,23 +222,23 @@ impl Micro {
         http.encode(response);
     }
 
-    pub fn run(self, addr: &str) -> Result<()> {
+    pub fn run(self, addr: &str, process_num: usize) -> Result<()> {
 
         let mut server = Server::new(addr).unwrap();
 
         server.run(Box::new(move |stream| {
             self.handle(stream);
-        }))?;
+        }), process_num)?;
 
         Ok(())
     }
 
-    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
+    pub fn run_tls(self, addr: &str, process_num: usize, cert: &str, private_key: &str) -> Result<()> {
         let mut server = Server::new(addr).unwrap();
 
         server.run_tls(Box::new(move |stream| {
             self.handle(stream);
-        }), cert, private_key)?;
+        }), process_num ,cert, private_key)?;
 
         Ok(())
     }
