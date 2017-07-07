@@ -1,275 +1,213 @@
-use std::sync::{Arc, Mutex};
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::io::ErrorKind::WouldBlock;
-use std::net::Shutdown;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
-use rustls;
-use rustls::Session;
-
-use soio::Token;
 use soio::tcp::TcpStream;
-use soio::channel;
-use soio::Evented;
-use soio::Poll;
 use soio::Ready;
-use soio::PollOpt;
 
-use threading::Pool;
+use rustls::{self, Session};
 
 use super::Handle;
-use super::stream::Stream;
-
-pub enum Event {
-    Write(Token),
-    Read(Token),
-    WriteTls(Token),
-}
+use super::Stream;
 
 pub struct Connection {
-    socket: TcpStream,
-    token: Token,
-    thread_pool: Rc<Pool>,
-    tx: channel::Sender<Event>,
-    stream: Arc<Mutex<Stream>>,
-    pub closing: bool,
+    pub socket: TcpStream,
     handle: Arc<Handle>,
+    stream: Arc<Mutex<Stream>>,
+    pub interest: Ready,
     tls_session: Option<rustls::ServerSession>,
+    pub close: bool,
 }
 
 impl Connection {
-    pub fn new(socket: TcpStream, token: Token, thread_pool: Rc<Pool>, tx: channel::Sender<Event>, handle: Arc<Handle>, tls_session: Option<rustls::ServerSession>) -> Connection {
+    pub fn new(socket: TcpStream, handle: Arc<Handle>, tls_session: Option<rustls::ServerSession>) -> Connection {
         Connection {
             socket: socket,
-            token: token,
-            thread_pool: thread_pool,
-            tx: tx,
-            stream: Arc::new(Mutex::new(Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024)))),
-            closing: false,
             handle: handle,
+            stream: Arc::new(Mutex::new(Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024)))),
+            interest: Ready::empty(),
             tls_session: tls_session,
+            close: false,
         }
     }
 
-    pub fn reader(&mut self) {
-        match self.tls_session {
-            Some(ref mut tls_session) => {
+    pub fn read(&mut self) {
+        {
+            let mut stream = self.stream.lock().unwrap();
 
-                match tls_session.read_tls(&mut self.socket) {
+            if !stream.reader.is_empty() {
+                stream.reader.clear();
+            }
+
+            loop {
+                let mut buf = [0; 1024];
+
+                match self.socket.read(&mut buf) {
                     Ok(size) => {
                         if size == 0 {
-                            self.closing = true;
+                            self.close = true;
                             return;
                         }
-                    },
+
+                        stream.reader.extend_from_slice(&buf[0..size]);
+
+                        if size < 1024 {
+                            break;
+                        }
+                    }
                     Err(err) => {
                         if let WouldBlock = err.kind() {
+                            break;
+                        } else {
+                            self.close = true;
                             return;
                         }
-
-                        self.closing = true;
-                        return;
                     }
                 }
-
-                if let Err(_) = tls_session.process_new_packets() {
-                    self.closing = true;
-                    return;
-                }
-
-                let mut stream = self.stream.lock().unwrap();
-
-                stream.remote_addr = self.socket.peer_addr().unwrap();
-
-                if let Err(_) = tls_session.read_to_end(&mut stream.reader) {
-                    self.closing = true;
-                    return;
-                }
-
-                if stream.len() != 0 {
-
-                    let tx = self.tx.clone();
-                    let token = self.token.clone();
-
-                    let handle = self.handle.clone();
-
-                    let stream = self.stream.clone();
-
-                    self.thread_pool.spawn(move || {
-
-                        handle(stream);
-
-                        tx.send(Event::WriteTls(token)).is_ok();
-
-                    });
-
-                } else {
-                    let rd = tls_session.wants_read();
-                    let wr = tls_session.wants_write();
-
-                    if rd && wr {
-                        self.tx.send(Event::Read(self.token)).is_ok();
-                        self.tx.send(Event::Write(self.token)).is_ok();
-                    } else if wr {
-                        self.tx.send(Event::Write(self.token)).is_ok();
-                    } else {
-                        self.tx.send(Event::Read(self.token)).is_ok();
-                    }
-                }
-
-
-            },
-            None => {
-
-                let mut stream = self.stream.lock().unwrap();
-
-                loop {
-
-                    let mut buf = [0; 1024];
-
-                    match self.socket.read(&mut buf) {
-                        Ok(size) => {
-                            if size == 0 {
-                                self.closing = true;
-                                return;
-                            } else {
-                                stream.reader.extend_from_slice(&buf[0..size]);
-
-                                if size < 1024 {
-                                    break;
-                                }
-                            }
-                        },
-                        Err(err) => {
-                            if let WouldBlock = err.kind() {
-                                break;
-                            } else {
-                                self.closing = true;
-                                return;
-                            }
-                        }
-                    }
-
-                }
-
-                stream.remote_addr = self.socket.peer_addr().unwrap();
-
-                let tx = self.tx.clone();
-                let token = self.token.clone();
-
-                let handle = self.handle.clone();
-
-                let stream = self.stream.clone();
-
-                self.thread_pool.spawn(move || {
-
-                    handle(stream);
-
-                    tx.send(Event::Write(token)).is_ok();
-
-                });
-
-
-            },
-        }
-    }
-
-    pub fn writer(&mut self) {
-        match self.tls_session {
-            Some(ref mut tls_session) => {
-                match tls_session.write_tls(&mut self.socket) {
-                    Ok(size) => {
-                        if size == 0 {
-                            self.closing = true;
-                            return;
-                        }
-                    },
-                    Err(_) => {
-                        self.closing = true;
-                        return;
-                    }
-                }
-
-                let rd = tls_session.wants_read();
-                let wr = tls_session.wants_write();
-
-                if rd && wr {
-                    self.tx.send(Event::Read(self.token)).is_ok();
-                    self.tx.send(Event::Write(self.token)).is_ok();
-                } else if wr {
-                    self.tx.send(Event::Write(self.token)).is_ok();
-                } else {
-                    self.tx.send(Event::Read(self.token)).is_ok();
-                }
-            },
-            None => {
-                let ref mut writer = self.stream.lock().unwrap().writer;
-        
-                match self.socket.write(writer) {
-                    Ok(size) => {
-                        if size == 0 {
-                            self.closing = true;
-                            return;
-                        }
-
-                        writer.clear();
-                    },
-                    Err(_) => {
-                        self.closing = true;
-                        return;
-                    }
-                }
-
-                self.tx.send(Event::Read(self.token)).is_ok();
             }
+
+            stream.remote_addr = self.socket.peer_addr().unwrap();
+        }
+
+        let stream = self.stream.clone();
+
+        (self.handle)(stream);
+
+        self.interest.remove(Ready::readable());
+        self.interest.insert(Ready::writable());
+    }
+
+    pub fn read_tls(&mut self) {
+        if let Some(ref mut tls_session) = self.tls_session {
+            match tls_session.read_tls(&mut self.socket) {
+                Ok(size) => {
+                    if size == 0 {
+                        self.close = true;
+                    }
+                }
+                Err(err) => {
+                    if let WouldBlock = err.kind() {
+                        //return;
+                    } else {
+                        self.close = true;
+                        return;
+                    }
+                }
+            }
+
+            if tls_session.process_new_packets().is_err() {
+                self.close = true;
+                return;
+            }
+
+            let next = {
+                let mut stream = self.stream.lock().unwrap();
+
+                stream.remote_addr = self.socket.peer_addr().unwrap();
+
+                if !stream.reader.is_empty() {
+                    stream.reader.clear();
+                }
+
+                if tls_session.read_to_end(&mut stream.reader).is_err() {
+                    self.close = true;
+                    return;
+                }
+
+                !stream.reader.is_empty()
+            };
+
+            if next {
+                let stream = self.stream.clone();
+                (self.handle)(stream);
+            }
+
+            {
+                let ref mut writer = self.stream.lock().unwrap().writer;
+
+                tls_session.write_all(writer).unwrap();
+            }
+
+            let rd = tls_session.wants_read();
+            let wr = tls_session.wants_write();
+
+            self.interest.remove(Ready::readable() | Ready::writable());
+
+            if rd && wr {
+                self.interest.insert(Ready::readable());
+                self.interest.insert(Ready::writable());
+            } else if wr {
+                self.interest.insert(Ready::writable());
+            } else {
+                self.interest.insert(Ready::readable());
+            }
+
+            if self.interest.is_empty() {
+                panic!("bug");
+            }
+
+        } else {
+            panic!("bug");
         }
     }
 
-    pub fn write_to_tls(&mut self) {
+    pub fn write(&mut self) {
         let ref mut writer = self.stream.lock().unwrap().writer;
 
-        match self.tls_session {
-            Some(ref mut tls_session) => {
-                tls_session.write_all(writer).unwrap();
-
-                let rd = tls_session.wants_read();
-                let wr = tls_session.wants_write();
-
-                if rd && wr {
-                    self.tx.send(Event::Read(self.token)).is_ok();
-                    self.tx.send(Event::Write(self.token)).is_ok();
-                } else if wr {
-                    self.tx.send(Event::Write(self.token)).is_ok();
-                } else {
-                    self.tx.send(Event::Read(self.token)).is_ok();
+        match self.socket.write(writer) {
+            Ok(size) => {
+                if size == 0 {
+                    self.close = true;
+                    return;
                 }
-            },
-            None => ()
+
+                writer.clear();
+            }
+            Err(_) => {
+                self.close = true;
+                return;
+            }
         }
 
-        writer.clear();
-
+        self.interest.remove(Ready::writable());
+        self.interest.insert(Ready::readable());
     }
 
-    pub fn shutdown(&self) {
-        let _ = self.socket.shutdown(Shutdown::Both);
-    }
-}
+    pub fn write_tls(&mut self) {
+        if let Some(ref mut tls_session) = self.tls_session {
+            match tls_session.write_tls(&mut self.socket) {
+                Ok(size) => {
+                    if size == 0 {
+                        self.close = true;
+                        return;
+                    }
+                }
+                Err(_) => {
+                    self.close = true;
+                    return;
+                }
+            }
 
-impl Evented for Connection {
-    fn register(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
-         -> io::Result<()>
-    {
-        self.socket.register(poll, token, interest, opts)
-    }
+            let rd = tls_session.wants_read();
+            let wr = tls_session.wants_write();
 
-    fn reregister(&self, poll: &Poll, token: Token, interest: Ready, opts: PollOpt)
-         -> io::Result<()>
-    {
-        self.socket.reregister(poll, token, interest, opts)
-    }
+            self.interest.remove(Ready::readable() | Ready::writable());
 
-    fn deregister(&self, poll: &Poll) -> io::Result<()> {
-        self.socket.deregister(poll)
+            if rd && wr {
+                self.interest.insert(Ready::readable());
+                self.interest.insert(Ready::writable());
+            } else if wr {
+                self.interest.insert(Ready::writable());
+            } else {
+                self.interest.insert(Ready::readable());
+            }
+
+            if self.interest.is_empty() {
+                panic!("bug");
+            }
+
+        } else {
+            panic!("bug");
+        }
     }
 }
