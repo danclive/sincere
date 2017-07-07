@@ -138,6 +138,5 @@ fn make_config(cert: &str, private_key: &str) -> Arc<rustls::ServerConfig> {
     let mut config = rustls::ServerConfig::new();
     config.set_single_cert(cert, privkey);
 
-
     Arc::new(config)
 }
