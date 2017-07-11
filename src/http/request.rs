@@ -11,8 +11,9 @@ use error::Result;
 pub struct Request {
     method: Method,
     path: String,
-    version: String,
-    headers: HashMap<String, String>,
+    //version: String,
+    //headers: HashMap<String, String>,
+    headers: Vec<(String, String)>,
     params: HashMap<String, String>,
     querys: HashMap<String, String>,
     remote_addr: SocketAddr,
@@ -20,11 +21,11 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(method: Method, path: String, version: String, headers: HashMap<String, String>, remote_addr: SocketAddr, data: Vec<u8>) -> Request {
+    pub fn new(method: Method, path: String, headers: Vec<(String, String)>, remote_addr: SocketAddr, data: Vec<u8>) -> Request {
         Request {
             method: method,
             path: path,
-            version: version,
+            //version: version,
             headers: headers,
             params: HashMap::new(),
             querys: HashMap::new(),
@@ -40,11 +41,12 @@ impl Request {
     pub fn path(&self) -> &str {
         &self.path
     }
-
+/*
     pub fn version(&self) -> &str {
         &self.version
     }
-
+*/
+/*
     pub fn headers(&mut self) -> &mut HashMap<String, String> {
         &mut self.headers
     }
@@ -54,7 +56,7 @@ impl Request {
     {
         self.headers.get(key.into()).map(|v| v.to_string())
     }
-
+*/
     pub fn remote_addr(&self) -> &SocketAddr {
         &self.remote_addr
     }

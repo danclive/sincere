@@ -1,8 +1,11 @@
-use std::collections::HashMap;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
+use httparse;
+
 use server::Stream;
+use error::Result;
+use error::Error;
 
 pub use self::request::Request;
 pub use self::response::Response;
@@ -27,50 +30,35 @@ impl Http {
         }
     }
 
-    pub fn decode(&mut self) -> Request {
-        let mut stream = self.stream.lock().unwrap();  
-        
-        let line = read_next_line(&mut stream);
-        let mut words = line.trim().split(' ');
+    pub fn decode(&mut self) -> Result<Request> {
+        let mut stream = self.stream.lock().unwrap();
 
-        let method = words.next();
-        let path = words.next();
-        let version = words.next();
+        let (method, path, headers, amt) = {
+            let mut headers = [httparse::EMPTY_HEADER; 16];
+            let mut req = httparse::Request::new(&mut headers);
+            let res = req.parse(&stream.reader).unwrap();
 
-        let method = method.unwrap();
-        let path = path.unwrap();
-        let version = version.unwrap();
+            let amt = match res {
+                httparse::Status::Complete(amt) => amt,
+                httparse::Status::Partial => return Err(Error::Error("Http paser error".to_owned()))
+            };
 
-        let mut headers: HashMap<String, String> = HashMap::new();
+            let method = req.method.unwrap().to_owned();
+            let path = req.path.unwrap().to_owned();
+            let headers = req.headers.iter().map(|h| (h.name.to_owned(), String::from_utf8(h.value.to_vec()).unwrap())).collect();
 
-        loop {
-            let line = read_next_line(&mut stream);
-
-            if line.len() == 0 {
-                break;
-            }
-
-            let mut header = line.trim().split(':');
-
-            let key = header.next();
-            let value = header.next();
-
-            let key = key.unwrap();
-            let value = value.unwrap().trim();
-
-            headers.insert(key.to_owned(), value.to_owned());
-        }
+            (method, path, headers, amt)
+        };
 
         let remote_addr = stream.remote_addr();
 
-        Request::new(
+        Ok(Request::new(
             method.parse().unwrap(),
-            path.to_owned(),
-            version.to_owned(),
+            path,
             headers,
             remote_addr,
-            stream.to_vec()
-        )
+            stream.reader.split_off(amt)
+        ))
     }
 
     pub fn encode(&mut self, response: Response) {
@@ -97,9 +85,7 @@ impl Http {
     }
 }
 
-
-
-fn read_next_line(stream: &mut Stream) -> String {
+pub fn read_next_line(stream: &mut Stream) -> String {
     let mut buf = Vec::new();
     let mut prev_byte_was_cr = false;
     let mut index: usize = 0;
