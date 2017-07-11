@@ -1,12 +1,12 @@
-use chrono::*;
+use chrono::{DateTime, Utc};
 
 pub struct HTTPDate {
-    d: DateTime<UTC>
+    d: DateTime<Utc>
 }
 
 impl HTTPDate {
     pub fn new() -> HTTPDate {
-        HTTPDate {d: UTC::now(),}
+        HTTPDate {d: Utc::now(),}
     }
 }
 
