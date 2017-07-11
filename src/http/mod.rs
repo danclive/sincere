@@ -97,7 +97,9 @@ impl Http {
     }
 }
 
-pub fn read_next_line(stream: &mut Stream) -> String {
+
+
+fn read_next_line(stream: &mut Stream) -> String {
     let mut buf = Vec::new();
     let mut prev_byte_was_cr = false;
     let mut index: usize = 0;
