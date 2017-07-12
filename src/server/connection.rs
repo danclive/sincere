@@ -20,11 +20,17 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(socket: TcpStream, handle: Arc<Handle>, tls_session: Option<rustls::ServerSession>) -> Connection {
+    pub fn new(
+        socket: TcpStream,
+        handle: Arc<Handle>,
+        tls_session: Option<rustls::ServerSession>
+    ) -> Connection {
         Connection {
             socket: socket,
             handle: handle,
-            stream: Arc::new(Mutex::new(Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024)))),
+            stream: Arc::new(Mutex::new(
+                Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024))
+                )),
             interest: Ready::empty(),
             tls_session: tls_session,
             close: false,

@@ -1,5 +1,4 @@
 extern crate soio;
-extern crate threading;
 extern crate chrono;
 extern crate regex;
 extern crate rustls;
