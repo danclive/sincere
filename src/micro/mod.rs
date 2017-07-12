@@ -135,88 +135,97 @@ impl Micro {
 
         let mut http = Http::new(stream);
 
-        let mut request = http.decode().unwrap();
         let mut response = Response::empty(200);
 
-        let mut route_found = false;
+        match http.decode() {
+            Ok(mut request) => {
 
-        for begin in self.begin.iter() {         
-            begin.execute(&mut request, &mut response);
-        }
+                let mut route_found = false;
 
-        'outer: for group in self.groups.iter() {
-
-            for route in group.routes.iter() {
-
-                if route.method() != request.method() {
-                    continue;
+                for begin in self.begin.iter() {         
+                    begin.execute(&mut request, &mut response);
                 }
 
-                let path = {
-                    let path = request.path();
-                    let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
-                    if path != "/" {
-                        path.trim_right_matches('/').to_owned()
-                    } else {
-                        path.to_owned()
-                    }
-                };
+                'outer: for group in self.groups.iter() {
 
-                let pattern = {
-                    let pattern = route.compilied_pattern();
-                    if pattern != "/" {
-                        pattern.trim_right_matches('/').to_owned()
-                    } else {
-                        pattern
-                    }
-                };
+                    for route in group.routes.iter() {
 
-                if pattern.contains("^") {
-                    let re = Regex::new(&pattern).unwrap();
-                    let caps = re.captures(&path);
+                        if route.method() != request.method() {
+                            continue;
+                        }
 
-                    if let Some(caps) = caps {
-                        route_found = true;
+                        let path = {
+                            let path = request.path();
+                            let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
+                            if path != "/" {
+                                path.trim_right_matches('/').to_owned()
+                            } else {
+                                path.to_owned()
+                            }
+                        };
 
-                        let matches = route.path();
+                        let pattern = {
+                            let pattern = route.compilied_pattern();
+                            if pattern != "/" {
+                                pattern.trim_right_matches('/').to_owned()
+                            } else {
+                                pattern
+                            }
+                        };
 
-                        for (key, value) in matches.iter() {
-                            request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                        if pattern.contains("^") {
+                            let re = Regex::new(&pattern).unwrap();
+                            let caps = re.captures(&path);
+
+                            if let Some(caps) = caps {
+                                route_found = true;
+
+                                let matches = route.path();
+
+                                for (key, value) in matches.iter() {
+                                    request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                                }
+                            }
+                        } else {
+                            if pattern == path {
+                                route_found = true;
+                            }
+                        }
+
+                        if route_found {
+                            
+                            for before in self.before.iter() {
+                                before.execute(&mut request, &mut response);
+                            }
+
+                            route.execute(&mut request, &mut response);
+
+                            for after in self.after.iter() {
+                                after.execute(&mut request, &mut response);
+                            }
+
+                            break 'outer;
                         }
                     }
-                } else {
-                    if pattern == path {
-                        route_found = true;
+                }
+
+                if !route_found {
+                    if let Some(ref not_found) = self.not_found {
+                        not_found.execute(&mut request, &mut response);
+                    } else {
+                        response.status(404).from_text("Not Found").unwrap();
                     }
                 }
 
-                if route_found {
-                    
-                    for before in self.before.iter() {
-                        before.execute(&mut request, &mut response);
-                    }
-
-                    route.execute(&mut request, &mut response);
-
-                    for after in self.after.iter() {
-                        after.execute(&mut request, &mut response);
-                    }
-
-                    break 'outer;
+                for finish in self.finish.iter() {
+                    finish.execute(&mut request, &mut response);
                 }
-            }
-        }
 
-        if !route_found {
-            if let Some(ref not_found) = self.not_found {
-                not_found.execute(&mut request, &mut response);
-            } else {
-                response.status(404).from_text("Not Found").unwrap();
             }
-        }
-
-        for finish in self.finish.iter() {
-            finish.execute(&mut request, &mut response);
+            Err(err) => {
+                response = Response::empty(501);
+                println!("http paser{:?}", err);
+            }
         }
 
         http.encode(response);

@@ -99,7 +99,6 @@ impl Worker {
                             panic!("bug");
                         }
 
-
                     }
                     token => {
                         let mut close = false;

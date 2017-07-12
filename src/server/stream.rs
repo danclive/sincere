@@ -21,24 +21,8 @@ impl Stream {
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.reader.len()
-    }
-
-    pub fn get(&self, index: usize) -> Option<&u8> {
-        self.reader.get(index)
-    }
-
-    pub fn split_off(&mut self, at: usize) {
-        self.reader = self.reader.split_off(at);
-    }
-
     pub fn remote_addr(&self) -> SocketAddr {
         self.remote_addr
-    }
-
-    pub fn to_vec(&mut self) -> Vec<u8> {
-        mem::replace(&mut self.reader, Vec::new())
     }
 }
 

@@ -34,7 +34,7 @@ impl Http {
         let mut stream = self.stream.lock().unwrap();
 
         let (method, path, headers, amt) = {
-            let mut headers = [httparse::EMPTY_HEADER; 16];
+            let mut headers = [httparse::EMPTY_HEADER; 24];
             let mut req = httparse::Request::new(&mut headers);
             let res = req.parse(&stream.reader).unwrap();
 
@@ -83,28 +83,4 @@ impl Http {
         stream.write(&data).unwrap();
         stream.write(&response.data).unwrap();
     }
-}
-
-pub fn read_next_line(stream: &mut Stream) -> String {
-    let mut buf = Vec::new();
-    let mut prev_byte_was_cr = false;
-    let mut index: usize = 0;
-
-    for i in 0.. {
-        let byte = stream.get(i).unwrap();
-
-        if *byte == b'\n' && prev_byte_was_cr {
-            buf.pop();
-            index = i;
-            break;
-        }
-
-        prev_byte_was_cr = *byte == b'\r';
-
-        buf.push(*byte);
-    }
-
-    stream.split_off(index + 1);
-
-    String::from_utf8(buf).unwrap()
 }
