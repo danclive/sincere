@@ -6,6 +6,7 @@ extern crate rustls;
 extern crate serde;
 extern crate serde_json;
 extern crate url;
+extern crate httparse;
 
 pub use server::Server;
 pub use http::Http;

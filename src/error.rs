@@ -3,11 +3,14 @@ use std::io;
 use std::fmt;
 use std::error;
 use std::sync::mpsc::TryRecvError;
+use std::string::FromUtf8Error;
 
 use soio::channel::SendError;
 use soio::tcp::TcpStream;
 
 use serde_json;
+
+use httparse;
 
 pub type Result<T> = result::Result<T, Error>;
 
@@ -17,6 +20,9 @@ pub enum Error {
     JsonError(serde_json::Error),
     SendSocketError(SendError<TcpStream>),
     ReceiveSocketError(TryRecvError),
+    FromUtf8Error(FromUtf8Error),
+    HttpParseError(httparse::Error),
+    Error(String),
 }
 
 impl From<io::Error> for Error {
@@ -43,6 +49,18 @@ impl From<TryRecvError> for Error {
     }
 }
 
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Self {
+        Error::FromUtf8Error(err)
+    }
+}
+
+impl From<httparse::Error> for Error {
+    fn from(err: httparse::Error) -> Self {
+        Error::HttpParseError(err)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -50,6 +68,9 @@ impl fmt::Display for Error {
             Error::JsonError(ref inner) => inner.fmt(fmt),
             Error::SendSocketError(ref inner) => inner.fmt(fmt),
             Error::ReceiveSocketError(ref inner) => inner.fmt(fmt),
+            Error::FromUtf8Error(ref inner) => inner.fmt(fmt),
+            Error::HttpParseError(ref inner) => inner.fmt(fmt),
+            Error::Error(ref inner) => inner.fmt(fmt),
         }
     }
 }
@@ -61,6 +82,9 @@ impl error::Error for Error {
             Error::JsonError(ref err) => err.description(),
             Error::SendSocketError(ref err) => err.description(),
             Error::ReceiveSocketError(ref err) => err.description(),
+            Error::FromUtf8Error(ref err) => err.description(),
+            Error::HttpParseError(ref err) => err.description(),
+            Error::Error(ref err) => err,
         }
     }
 
@@ -70,6 +94,9 @@ impl error::Error for Error {
             Error::JsonError(ref err) => Some(err),
             Error::SendSocketError(ref err) => Some(err),
             Error::ReceiveSocketError(ref err) => Some(err),
+            Error::FromUtf8Error(ref err) => Some(err),
+            Error::HttpParseError(ref err) => Some(err),
+            Error::Error(_) => None,
         }
     }
 }

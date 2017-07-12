@@ -135,7 +135,7 @@ impl Micro {
 
         let mut http = Http::new(stream);
 
-        let mut request = http.decode();
+        let mut request = http.decode().unwrap();
         let mut response = Response::empty(200);
 
         let mut route_found = false;
