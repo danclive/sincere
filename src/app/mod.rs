@@ -201,7 +201,15 @@ impl App {
                                 before.execute(&mut context);
                             }
 
+                            for before in group.before.iter() {
+                                before.execute(&mut context);
+                            }
+
                             route.execute(&mut context);
+
+                            for after in group.after.iter() {
+                                after.execute(&mut context);
+                            }
 
                             for after in self.after.iter() {
                                 after.execute(&mut context);

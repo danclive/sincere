@@ -1,9 +1,12 @@
 use super::route::Route;
 use super::context::Context;
+use super::middleware::Middleware;
 
 pub struct Group {
     pub routes: Vec<Route>,
     prefix: String,
+    pub before: Vec<Middleware>,
+    pub after: Vec<Middleware>,
 }
 
 impl Group {
@@ -11,6 +14,8 @@ impl Group {
         Group {
             routes: Vec::new(),
             prefix: prefix.to_owned(),
+            before: Vec::new(),
+            after: Vec::new(),
         }
     }
 
@@ -61,5 +66,21 @@ impl Group {
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("HEAD", pattern, handle)
+    }
+
+    pub fn before<H>(&mut self, handle: H)
+        where H: Fn(&mut Context) + Send + Sync + 'static
+    {
+        self.before.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
+    pub fn after<H>(&mut self, handle: H)
+        where H: Fn(&mut Context) + Send + Sync + 'static
+    {
+        self.after.push(Middleware {
+            inner: Box::new(handle),
+        });
     }
 }

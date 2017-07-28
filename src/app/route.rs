@@ -4,6 +4,7 @@ use std::ascii::AsciiExt;
 use http::Method;
 use super::Handle;
 use super::context::Context;
+use super::middleware::Middleware;
 
 pub struct Route {
     pattern: String,
@@ -11,6 +12,8 @@ pub struct Route {
     handle: Box<Handle>,
     compilied_pattern: String,
     paths: HashMap<String, usize>,
+    before: Vec<Middleware>,
+    after: Vec<Middleware>,
 }
 
 impl Route {
@@ -21,6 +24,8 @@ impl Route {
             handle: handle,
             compilied_pattern: String::default(),
             paths: HashMap::new(),
+            before: Vec::new(),
+            after: Vec::new(),
         };
 
         route.re_connfigure(pattern);
@@ -40,17 +45,38 @@ impl Route {
         self.compilied_pattern.clone()
     }
 
-    pub fn name(&mut self, name: &str) {
-        println!("{:?}", name);
-        println!("{:?}", self.method);
-    }
-
     pub fn path(&self) -> HashMap<String, usize> {
         self.paths.clone()
     }
 
     pub fn execute(&self, context: &mut Context) {
-        (self.handle)(context);
+        for before in self.before.iter() {
+            before.execute(context);
+        }
+
+        if context.next() {
+            (self.handle)(context);
+        }
+
+        for after in self.after.iter() {
+            after.execute(context);
+        }
+    }
+
+    pub fn before<H>(&mut self, handle: H)
+        where H: Fn(&mut Context) + Send + Sync + 'static
+    {
+        self.before.push(Middleware {
+            inner: Box::new(handle),
+        });
+    }
+
+    pub fn after<H>(&mut self, handle: H)
+        where H: Fn(&mut Context) + Send + Sync + 'static
+    {
+        self.after.push(Middleware {
+            inner: Box::new(handle),
+        });
     }
 
     fn re_connfigure(&mut self, pattern: String) {
