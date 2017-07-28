@@ -12,12 +12,12 @@ pub use server::Server;
 pub use http::Http;
 pub use http::Request;
 pub use http::Response;
-pub use micro::Micro;
-pub use micro::Group;
+pub use app::App;
+pub use app::Group;
 pub use error::Error;
 
 pub mod server;
 pub mod http;
-pub mod micro;
+pub mod app;
 pub mod util;
 pub mod error;

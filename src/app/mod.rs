@@ -6,18 +6,21 @@ use server::Server;
 use server::Stream;
 
 use http::Http;
-use http::Request;
 use http::Response;
-
-use self::route::Route;
-pub use self::route::Group;
+pub use self::route::Route;
+pub use self::group::Group;
+pub use self::context::Context;
+use self::middleware::Middleware;
 use error::Result;
 
 mod route;
+mod context;
+mod group;
+mod middleware;
 
-pub type Handle = Fn(&mut Request, &mut Response) + Send + Sync + 'static;
+pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 
-pub struct Micro {
+pub struct App {
     groups: Vec<Group>,
     begin: Vec<Middleware>,
     before: Vec<Middleware>,
@@ -26,9 +29,9 @@ pub struct Micro {
     not_found: Option<Middleware>,
 }
 
-impl Micro {
-    pub fn new() -> Micro {
-        Micro {
+impl App {
+    pub fn new() -> App {
+        App {
             groups: vec![Group::new("")],
             begin: Vec::new(),
             before: Vec::new(),
@@ -39,7 +42,7 @@ impl Micro {
     }
 
     fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         let route = Route::new(
             method.parse().unwrap(), 
@@ -52,37 +55,37 @@ impl Micro {
     }
 
     pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("GET", pattern, handle)
     }
 
     pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("POST", pattern, handle)
     }
 
     pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("PUT", pattern, handle)
     }
 
     pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("DELETE", pattern, handle)
     }
 
     pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("OPTION", pattern, handle)
     }
 
     pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.add("HEAD", pattern, handle)
     }
@@ -92,7 +95,7 @@ impl Micro {
     }
 
     pub fn begin<H>(&mut self, handle: H)
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.begin.push(Middleware {
             inner: Box::new(handle),
@@ -100,7 +103,7 @@ impl Micro {
     }
 
     pub fn before<H>(&mut self, handle: H)
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.before.push(Middleware {
             inner: Box::new(handle),
@@ -108,7 +111,7 @@ impl Micro {
     }
 
     pub fn after<H>(&mut self, handle: H)
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.after.push(Middleware {
             inner: Box::new(handle),
@@ -116,7 +119,7 @@ impl Micro {
     }
 
     pub fn finish<H>(&mut self, handle: H)
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.finish.push(Middleware {
             inner: Box::new(handle),
@@ -124,7 +127,7 @@ impl Micro {
     }
 
     pub fn not_found<H>(&mut self, handle: H)
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
+        where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.not_found = Some(Middleware {
             inner: Box::new(handle),
@@ -135,27 +138,27 @@ impl Micro {
 
         let mut http = Http::new(stream);
 
-        let mut response = Response::empty(200);
-
         match http.decode() {
-            Ok(mut request) => {
+            Ok(request) => {
+
+                let mut context = Context::new(request);
 
                 let mut route_found = false;
 
                 for begin in self.begin.iter() {         
-                    begin.execute(&mut request, &mut response);
+                    begin.execute(&mut context);
                 }
 
                 'outer: for group in self.groups.iter() {
 
                     for route in group.routes.iter() {
 
-                        if route.method() != request.method() {
+                        if route.method() != context.request.method() {
                             continue;
                         }
 
                         let path = {
-                            let path = request.path();
+                            let path = context.request.path();
                             let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
                             if path != "/" {
                                 path.trim_right_matches('/').to_owned()
@@ -183,7 +186,7 @@ impl Micro {
                                 let matches = route.path();
 
                                 for (key, value) in matches.iter() {
-                                    request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                                    context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
                                 }
                             }
                         } else {
@@ -195,13 +198,13 @@ impl Micro {
                         if route_found {
                             
                             for before in self.before.iter() {
-                                before.execute(&mut request, &mut response);
+                                before.execute(&mut context);
                             }
 
-                            route.execute(&mut request, &mut response);
+                            route.execute(&mut context);
 
                             for after in self.after.iter() {
-                                after.execute(&mut request, &mut response);
+                                after.execute(&mut context);
                             }
 
                             break 'outer;
@@ -211,24 +214,25 @@ impl Micro {
 
                 if !route_found {
                     if let Some(ref not_found) = self.not_found {
-                        not_found.execute(&mut request, &mut response);
+                        not_found.execute(&mut context);
                     } else {
-                        response.status(404).from_text("Not Found").unwrap();
+                        context.response.status(404).from_text("Not Found").unwrap();
                     }
                 }
 
                 for finish in self.finish.iter() {
-                    finish.execute(&mut request, &mut response);
+                    finish.execute(&mut context);
                 }
+
+                http.encode(context.response);
 
             }
             Err(err) => {
-                response = Response::empty(501);
+                let response = Response::empty(501);
+                http.encode(response);
                 println!("http paser{:?}", err);
             }
         }
-
-        http.encode(response);
     }
 
     pub fn run(self, addr: &str, process_num: usize) -> Result<()> {
@@ -250,15 +254,5 @@ impl Micro {
         }), process_num ,cert, private_key)?;
 
         Ok(())
-    }
-}
-
-struct Middleware {
-    inner: Box<Handle>,
-}
-
-impl Middleware {
-    fn execute(&self, request: &mut Request, response: &mut Response) {
-        (self.inner)(request, response);
     }
 }

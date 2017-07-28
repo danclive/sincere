@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::ascii::AsciiExt;
 
 use http::Method;
-use http::Request;
-use http::Response;
 use super::Handle;
+use super::context::Context;
 
 pub struct Route {
     pattern: String,
@@ -50,8 +49,8 @@ impl Route {
         self.paths.clone()
     }
 
-    pub fn execute(&self, request: &mut Request, response: &mut Response) {
-        (self.handle)(request, response);
+    pub fn execute(&self, context: &mut Context) {
+        (self.handle)(context);
     }
 
     fn re_connfigure(&mut self, pattern: String) {
@@ -68,69 +67,6 @@ impl Route {
         }
 
         self.compilied_pattern = compile_pattern(prce_pattern);
-    }
-}
-
-pub struct Group {
-    pub routes: Vec<Route>,
-    prefix: String,
-}
-
-impl Group {
-    pub fn new(prefix: &str) -> Group {
-        Group {
-            routes: Vec::new(),
-            prefix: prefix.to_owned(),
-        }
-    }
-
-    fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        let route = Route::new(
-            method.parse().unwrap(), 
-            self.prefix.clone() + pattern,
-            Box::new(handle),
-        );
-
-        self.routes.push(route);
-        self.routes.last_mut().unwrap()
-    }
-
-    pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        self.add("GET", pattern, handle)
-    }
-
-    pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        self.add("POST", pattern, handle)
-    }
-
-    pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        self.add("PUT", pattern, handle)
-    }
-
-    pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        self.add("DELETE", pattern, handle)
-    }
-
-    pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        self.add("OPTION", pattern, handle)
-    }
-
-    pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Request, &mut Response) + Send + Sync + 'static
-    {
-        self.add("HEAD", pattern, handle)
     }
 }
 

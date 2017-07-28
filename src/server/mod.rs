@@ -15,7 +15,7 @@ use self::process::Process;
 use self::worker::Worker;
 use self::connection::Connection;
 
-pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync + 'static>;
+pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync>;
 
 mod stream;
 mod process;
