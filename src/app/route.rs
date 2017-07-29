@@ -63,20 +63,24 @@ impl Route {
         }
     }
 
-    pub fn before<H>(&mut self, handle: H)
+    pub fn before<H>(&mut self, handle: H) -> &mut Route
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.before.push(Middleware {
             inner: Box::new(handle),
         });
+
+        self
     }
 
-    pub fn after<H>(&mut self, handle: H)
+    pub fn after<H>(&mut self, handle: H) -> &mut Route
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         self.after.push(Middleware {
             inner: Box::new(handle),
         });
+
+        self
     }
 
     fn re_connfigure(&mut self, pattern: String) {

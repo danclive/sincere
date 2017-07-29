@@ -36,7 +36,7 @@ impl Http {
         let (method, path, headers, amt) = {
             let mut headers = [httparse::EMPTY_HEADER; 24];
             let mut req = httparse::Request::new(&mut headers);
-            let res = req.parse(&stream.reader).unwrap();
+            let res = req.parse(&stream.reader)?;
 
             let amt = match res {
                 httparse::Status::Complete(amt) => amt,

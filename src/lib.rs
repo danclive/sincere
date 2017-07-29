@@ -14,6 +14,7 @@ pub use http::Request;
 pub use http::Response;
 pub use app::App;
 pub use app::Group;
+pub use app::Context;
 pub use error::Error;
 
 pub mod server;
