@@ -13,6 +13,8 @@ pub use self::context::Context;
 use self::middleware::Middleware;
 use error::Result;
 
+#[macro_use]
+mod macros;
 mod route;
 mod context;
 mod group;
@@ -54,77 +56,21 @@ impl App {
         self.groups.get_mut(0).unwrap().routes.last_mut().unwrap()
     }
 
-    pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("GET", pattern, handle)
-    }
-
-    pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("POST", pattern, handle)
-    }
-
-    pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("PUT", pattern, handle)
-    }
-
-    pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("DELETE", pattern, handle)
-    }
-
-    pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("OPTION", pattern, handle)
-    }
-
-    pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("HEAD", pattern, handle)
-    }
+    route!(get);
+    route!(post);
+    route!(put);
+    route!(delete);
+    route!(option);
+    route!(head);
 
     pub fn mount(&mut self, group: Group) {
         self.groups.push(group)
     }
 
-    pub fn begin<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.begin.push(Middleware {
-            inner: Box::new(handle),
-        });
-    }
-
-    pub fn before<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.before.push(Middleware {
-            inner: Box::new(handle),
-        });
-    }
-
-    pub fn after<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.after.push(Middleware {
-            inner: Box::new(handle),
-        });
-    }
-
-    pub fn finish<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.finish.push(Middleware {
-            inner: Box::new(handle),
-        });
-    }
+    middleware!(begin);
+    middleware!(before);
+    middleware!(after);
+    middleware!(finish);
 
     pub fn not_found<H>(&mut self, handle: H)
         where H: Fn(&mut Context) + Send + Sync + 'static

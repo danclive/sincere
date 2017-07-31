@@ -32,55 +32,13 @@ impl Group {
         self.routes.last_mut().unwrap()
     }
 
-    pub fn get<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("GET", pattern, handle)
-    }
+    route!(get);
+    route!(post);
+    route!(put);
+    route!(delete);
+    route!(option);
+    route!(head);
 
-    pub fn post<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("POST", pattern, handle)
-    }
-
-    pub fn put<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("PUT", pattern, handle)
-    }
-
-    pub fn delete<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("DELETE", pattern, handle)
-    }
-
-    pub fn option<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("OPTION", pattern, handle)
-    }
-
-    pub fn head<H>(&mut self, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.add("HEAD", pattern, handle)
-    }
-
-    pub fn before<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.before.push(Middleware {
-            inner: Box::new(handle),
-        });
-    }
-
-    pub fn after<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
-    {
-        self.after.push(Middleware {
-            inner: Box::new(handle),
-        });
-    }
+    middleware!(before);
+    middleware!(after);
 }

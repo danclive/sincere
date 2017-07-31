@@ -45,7 +45,7 @@ impl Http {
 
             let method = req.method.unwrap().to_owned();
             let path = req.path.unwrap().to_owned();
-            let headers = req.headers.iter().map(|h| (h.name.to_owned(), String::from_utf8(h.value.to_vec()).unwrap())).collect();
+            let headers = req.headers.iter().map(|h| (h.name.to_owned(), String::from_utf8_lossy(h.value).to_string())).collect();
 
             (method, path, headers, amt)
         };
