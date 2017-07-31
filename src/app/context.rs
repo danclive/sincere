@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 use http::Request;
 use http::Response;
 
 pub struct Context {
 	pub request: Request,
 	pub response: Response,
+	pub contexts: HashMap<String, String>,
 	stop: bool
 }
 
@@ -14,6 +16,7 @@ impl Context {
 		Context {
 			request: request,
 			response: response,
+			contexts: HashMap::new(),
 			stop: false
 		}
 	}
