@@ -1,8 +1,8 @@
 [package]
 name          = "sincere"
-version       = "0.3.2"
+version       = "0.3.3"
 license       = "MIT"
-authors       = ["dangcheng <dangcheng@hotmail.com>"]
+authors       = ["mitum <dangcheng@hotmail.com>"]
 description   = "web framework"
 documentation = "https://docs.rs/sincere"
 homepage      = "https://github.com/mcorce/sincere"
