@@ -97,10 +97,7 @@ impl Connection {
         let event_tx = self.event_tx.clone();
         let token = self.token;
 
-        //(self.handle)(stream);
-
         self.interest.remove(Ready::readable());
-        //self.interest.insert(Ready::writable());
 
         self.pool.spawn(move || {
 
@@ -152,18 +149,6 @@ impl Connection {
                 !stream.reader.is_empty()
             };
 
-            /*
-            if next {
-                let stream = self.stream.clone();
-                (self.handle)(stream);
-            }
-
-            if next {
-                let ref mut writer = self.stream.lock().unwrap().writer;
-
-                tls_session.write_all(writer).unwrap();
-            }
-            */
             if next {
 
                 self.handshake = false;
