@@ -128,7 +128,7 @@ impl Connection {
                 (self.handle)(stream);
             }
 
-            {
+            if next {
                 let ref mut writer = self.stream.lock().unwrap().writer;
 
                 tls_session.write_all(writer).unwrap();
