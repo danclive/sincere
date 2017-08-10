@@ -1,14 +1,20 @@
 use std::io::{Read, Write};
 use std::io::ErrorKind::WouldBlock;
 use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use soio::tcp::TcpStream;
 use soio::Ready;
+use soio::Token;
+use soio::channel::Sender;
 
 use rustls::{self, Session};
 
+use threading::Pool;
+
 use super::Handle;
 use super::Stream;
+use super::worker::Event;
 
 pub struct Connection {
     pub socket: TcpStream,
@@ -17,13 +23,20 @@ pub struct Connection {
     pub interest: Ready,
     tls_session: Option<rustls::ServerSession>,
     pub close: bool,
+    pool: Rc<Pool>,
+    event_tx: Sender<Event>,
+    token: Token,
+    pub handshake: bool
 }
 
 impl Connection {
     pub fn new(
         socket: TcpStream,
         handle: Arc<Handle>,
-        tls_session: Option<rustls::ServerSession>
+        tls_session: Option<rustls::ServerSession>,
+        pool: Rc<Pool>,
+        event_tx: Sender<Event>,
+        token: Token,
     ) -> Connection {
         Connection {
             socket: socket,
@@ -34,6 +47,10 @@ impl Connection {
             interest: Ready::empty(),
             tls_session: tls_session,
             close: false,
+            pool: pool,
+            event_tx: event_tx,
+            token: token,
+            handshake: false
         }
     }
 
@@ -76,11 +93,21 @@ impl Connection {
         }
 
         let stream = self.stream.clone();
+        let handle = self.handle.clone();
+        let event_tx = self.event_tx.clone();
+        let token = self.token;
 
-        (self.handle)(stream);
+        //(self.handle)(stream);
 
         self.interest.remove(Ready::readable());
-        self.interest.insert(Ready::writable());
+        //self.interest.insert(Ready::writable());
+
+        self.pool.spawn(move || {
+
+            handle(stream);
+            event_tx.send(Event::Write(token)).is_ok();
+
+        });
     }
 
     pub fn read_tls(&mut self) {
@@ -106,6 +133,8 @@ impl Connection {
                 return;
             }
 
+            self.handshake = true;
+
             let next = {
                 let mut stream = self.stream.lock().unwrap();
 
@@ -123,6 +152,7 @@ impl Connection {
                 !stream.reader.is_empty()
             };
 
+            /*
             if next {
                 let stream = self.stream.clone();
                 (self.handle)(stream);
@@ -133,23 +163,43 @@ impl Connection {
 
                 tls_session.write_all(writer).unwrap();
             }
+            */
+            if next {
 
-            let rd = tls_session.wants_read();
-            let wr = tls_session.wants_write();
+                self.handshake = false;
 
-            self.interest.remove(Ready::readable() | Ready::writable());
+                let stream = self.stream.clone();
+                let handle = self.handle.clone();
+                let event_tx = self.event_tx.clone();
+                let token = self.token;
 
-            if rd && wr {
-                self.interest.insert(Ready::readable());
-                self.interest.insert(Ready::writable());
-            } else if wr {
-                self.interest.insert(Ready::writable());
+                self.pool.spawn(move || {
+
+                    handle(stream);
+                    event_tx.send(Event::WriteTls(token)).is_ok();
+
+                });
+
             } else {
-                self.interest.insert(Ready::readable());
-            }
 
-            if self.interest.is_empty() {
-                panic!("bug");
+                let rd = tls_session.wants_read();
+                let wr = tls_session.wants_write();
+
+                self.interest.remove(Ready::readable() | Ready::writable());
+
+                if rd && wr {
+                    self.interest.insert(Ready::readable());
+                    self.interest.insert(Ready::writable());
+                } else if wr {
+                    self.interest.insert(Ready::writable());
+                } else {
+                    self.interest.insert(Ready::readable());
+                }
+
+                if self.interest.is_empty() {
+                    panic!("bug");
+                }
+
             }
 
         } else {
@@ -214,6 +264,31 @@ impl Connection {
 
         } else {
             panic!("bug");
+        }
+    }
+
+    pub fn write_to_tls(&mut self) {
+        if let Some(ref mut tls_session) = self.tls_session {
+            let ref mut writer = self.stream.lock().unwrap().writer;
+            tls_session.write_all(writer).unwrap();
+
+            let rd = tls_session.wants_read();
+            let wr = tls_session.wants_write();
+
+            self.interest.remove(Ready::readable() | Ready::writable());
+
+            if rd && wr {
+                self.interest.insert(Ready::readable());
+                self.interest.insert(Ready::writable());
+            } else if wr {
+                self.interest.insert(Ready::writable());
+            } else {
+                self.interest.insert(Ready::readable());
+            }
+
+            if self.interest.is_empty() {
+                panic!("bug");
+            }
         }
     }
 }
