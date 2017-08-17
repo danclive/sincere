@@ -15,7 +15,8 @@ use self::process::Process;
 use self::worker::Worker;
 use self::connection::Connection;
 
-pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync>;
+//pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync>;
+pub type Handle = Box<Fn(&mut Stream) + Send + Sync>;
 
 mod stream;
 mod process;
@@ -137,6 +138,9 @@ fn make_config(cert: &str, private_key: &str) -> Arc<rustls::ServerConfig> {
 
     let mut config = rustls::ServerConfig::new();
     config.set_single_cert(cert, privkey);
+
+    let session_memory_cache = rustls::ServerSessionMemoryCache::new(256);
+    config.set_persistence(session_memory_cache);
 
     Arc::new(config)
 }

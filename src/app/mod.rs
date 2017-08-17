@@ -80,7 +80,7 @@ impl App {
         });
     }
 
-    pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
+    pub fn handle(&self, stream: &mut Stream) {
 
         let mut http = Http::new(stream);
 
@@ -95,83 +95,87 @@ impl App {
                     begin.execute(&mut context);
                 }
 
-                'outer: for group in self.groups.iter() {
+                if context.next() {
 
-                    for route in group.routes.iter() {
+                    'outer: for group in self.groups.iter() {
 
-                        if route.method() != context.request.method() {
-                            continue;
-                        }
+                        for route in group.routes.iter() {
 
-                        let path = {
-                            let path = context.request.path();
-                            let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
-                            if path != "/" {
-                                path.trim_right_matches('/').to_owned()
-                            } else {
-                                path.to_owned()
+                            if route.method() != context.request.method() {
+                                continue;
                             }
-                        };
 
-                        let pattern = {
-                            let pattern = route.compilied_pattern();
-                            if pattern != "/" {
-                                pattern.trim_right_matches('/').to_owned()
+                            let path = {
+                                let path = context.request.path();
+                                let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
+                                if path != "/" {
+                                    path.trim_right_matches('/').to_owned()
+                                } else {
+                                    path.to_owned()
+                                }
+                            };
+
+                            let pattern = {
+                                let pattern = route.compilied_pattern();
+                                if pattern != "/" {
+                                    pattern.trim_right_matches('/').to_owned()
+                                } else {
+                                    pattern
+                                }
+                            };
+
+                            if pattern.contains("^") {
+                                let re = Regex::new(&pattern).unwrap();
+                                let caps = re.captures(&path);
+
+                                if let Some(caps) = caps {
+                                    route_found = true;
+
+                                    let matches = route.path();
+
+                                    for (key, value) in matches.iter() {
+                                        context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                                    }
+                                }
                             } else {
-                                pattern
-                            }
-                        };
-
-                        if pattern.contains("^") {
-                            let re = Regex::new(&pattern).unwrap();
-                            let caps = re.captures(&path);
-
-                            if let Some(caps) = caps {
-                                route_found = true;
-
-                                let matches = route.path();
-
-                                for (key, value) in matches.iter() {
-                                    context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                                if pattern == path {
+                                    route_found = true;
                                 }
                             }
+
+                            if route_found {
+                                
+                                for before in self.before.iter() {
+                                    before.execute(&mut context);
+                                }
+
+                                for before in group.before.iter() {
+                                    before.execute(&mut context);
+                                }
+
+                                route.execute(&mut context);
+
+                                for after in group.after.iter() {
+                                    after.execute(&mut context);
+                                }
+
+                                for after in self.after.iter() {
+                                    after.execute(&mut context);
+                                }
+
+                                break 'outer;
+                            }
+                        }
+                    }
+
+                    if !route_found {
+                        if let Some(ref not_found) = self.not_found {
+                            not_found.execute(&mut context);
                         } else {
-                            if pattern == path {
-                                route_found = true;
-                            }
-                        }
-
-                        if route_found {
-                            
-                            for before in self.before.iter() {
-                                before.execute(&mut context);
-                            }
-
-                            for before in group.before.iter() {
-                                before.execute(&mut context);
-                            }
-
-                            route.execute(&mut context);
-
-                            for after in group.after.iter() {
-                                after.execute(&mut context);
-                            }
-
-                            for after in self.after.iter() {
-                                after.execute(&mut context);
-                            }
-
-                            break 'outer;
+                            context.response.status(404).from_text("Not Found").unwrap();
                         }
                     }
-                }
 
-                if !route_found {
-                    if let Some(ref not_found) = self.not_found {
-                        not_found.execute(&mut context);
-                    } else {
-                        context.response.status(404).from_text("Not Found").unwrap();
-                    }
                 }
 
                 for finish in self.finish.iter() {

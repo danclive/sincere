@@ -19,19 +19,20 @@ mod http_method;
 mod request;
 mod response;
 
-pub struct Http {
-    stream: Arc<Mutex<Stream>>,
+pub struct Http<'a> {
+    stream: &'a mut Stream,
 }
 
-impl Http {
-    pub fn new(stream: Arc<Mutex<Stream>>) -> Http {
+impl<'a> Http<'a> {
+    pub fn new(stream: &mut Stream) -> Http {
         Http {
             stream: stream,
         }
     }
 
     pub fn decode(&mut self) -> Result<Request> {
-        let mut stream = self.stream.lock().unwrap();
+        //let mut stream = self.stream.lock().unwrap();
+        let ref mut stream = self.stream;
 
         let (method, path, headers, amt) = {
             let mut headers = [httparse::EMPTY_HEADER; 24];
@@ -62,7 +63,9 @@ impl Http {
     }
 
     pub fn encode(&mut self, response: Response) {
-        let mut stream = self.stream.lock().unwrap();
+        //let mut stream = self.stream.lock().unwrap();
+
+        let ref mut stream = self.stream;
 
         let mut data = Vec::new();
 

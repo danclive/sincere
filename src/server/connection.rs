@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::io::ErrorKind::WouldBlock;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use soio::tcp::TcpStream;
 use soio::Ready;
@@ -13,7 +13,7 @@ use super::Stream;
 pub struct Connection {
     pub socket: TcpStream,
     handle: Arc<Handle>,
-    stream: Arc<Mutex<Stream>>,
+    stream: Stream,
     pub interest: Ready,
     tls_session: Option<rustls::ServerSession>,
     pub close: bool,
@@ -28,9 +28,7 @@ impl Connection {
         Connection {
             socket: socket,
             handle: handle,
-            stream: Arc::new(Mutex::new(
-                Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024))
-                )),
+            stream: Stream::new(Vec::with_capacity(1024), Vec::with_capacity(1024)),
             interest: Ready::empty(),
             tls_session: tls_session,
             close: false,
@@ -38,46 +36,40 @@ impl Connection {
     }
 
     pub fn read(&mut self) {
-        {
-            let mut stream = self.stream.lock().unwrap();
+        if !self.stream.reader.is_empty() {
+            self.stream.reader.clear();
+        }
 
-            if !stream.reader.is_empty() {
-                stream.reader.clear();
-            }
+        loop {
+            let mut buf = [0; 1024];
 
-            loop {
-                let mut buf = [0; 1024];
-
-                match self.socket.read(&mut buf) {
-                    Ok(size) => {
-                        if size == 0 {
-                            self.close = true;
-                            return;
-                        }
-
-                        stream.reader.extend_from_slice(&buf[0..size]);
-
-                        if size < 1024 {
-                            break;
-                        }
+            match self.socket.read(&mut buf) {
+                Ok(size) => {
+                    if size == 0 {
+                        self.close = true;
+                        return;
                     }
-                    Err(err) => {
-                        if let WouldBlock = err.kind() {
-                            break;
-                        } else {
-                            self.close = true;
-                            return;
-                        }
+
+                    self.stream.reader.extend_from_slice(&buf[0..size]);
+
+                    if size < 1024 {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    if let WouldBlock = err.kind() {
+                        break;
+                    } else {
+                        self.close = true;
+                        return;
                     }
                 }
             }
-
-            stream.remote_addr = self.socket.peer_addr().unwrap();
         }
 
-        let stream = self.stream.clone();
+        self.stream.remote_addr = self.socket.peer_addr().unwrap();
 
-        (self.handle)(stream);
+        (self.handle)(&mut self.stream);
 
         self.interest.remove(Ready::readable());
         self.interest.insert(Ready::writable());
@@ -107,31 +99,26 @@ impl Connection {
             }
 
             let next = {
-                let mut stream = self.stream.lock().unwrap();
+                self.stream.remote_addr = self.socket.peer_addr().unwrap();
 
-                stream.remote_addr = self.socket.peer_addr().unwrap();
-
-                if !stream.reader.is_empty() {
-                    stream.reader.clear();
+                if !self.stream.reader.is_empty() {
+                    self.stream.reader.clear();
                 }
 
-                if tls_session.read_to_end(&mut stream.reader).is_err() {
+                if tls_session.read_to_end(&mut self.stream.reader).is_err() {
                     self.close = true;
                     return;
                 }
 
-                !stream.reader.is_empty()
+                !self.stream.reader.is_empty()
             };
 
             if next {
-                let stream = self.stream.clone();
-                (self.handle)(stream);
+                (self.handle)(&mut self.stream);
             }
 
             if next {
-                let ref mut writer = self.stream.lock().unwrap().writer;
-
-                tls_session.write_all(writer).unwrap();
+                tls_session.write_all(&mut self.stream.writer).unwrap();
             }
 
             let rd = tls_session.wants_read();
@@ -158,16 +145,14 @@ impl Connection {
     }
 
     pub fn write(&mut self) {
-        let ref mut writer = self.stream.lock().unwrap().writer;
-
-        match self.socket.write(writer) {
+        match self.socket.write(&self.stream.writer) {
             Ok(size) => {
                 if size == 0 {
                     self.close = true;
                     return;
                 }
 
-                writer.clear();
+                self.stream.writer.clear();
             }
             Err(_) => {
                 self.close = true;
