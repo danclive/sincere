@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use regex::Regex;
 
 use server::Server;
@@ -92,7 +90,7 @@ impl App {
                 let mut route_found = false;
 
                 for begin in self.begin.iter() {         
-                    begin.execute(&mut context);
+                    begin.execute_always(&mut context);
                 }
 
                 if context.next() {
@@ -179,7 +177,7 @@ impl App {
                 }
 
                 for finish in self.finish.iter() {
-                    finish.execute(&mut context);
+                    finish.execute_always(&mut context);
                 }
 
                 http.encode(context.response);

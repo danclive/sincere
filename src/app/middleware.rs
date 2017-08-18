@@ -11,4 +11,8 @@ impl Middleware {
             (self.inner)(context);
         }
     }
+
+    pub fn execute_always(&self, context: &mut Context) {
+        (self.inner)(context);
+    }
 }
