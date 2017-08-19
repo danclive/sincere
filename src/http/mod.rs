@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::sync::{Arc, Mutex};
 
 use httparse;
 
@@ -31,13 +30,10 @@ impl<'a> Http<'a> {
     }
 
     pub fn decode(&mut self) -> Result<Request> {
-        //let mut stream = self.stream.lock().unwrap();
-        let ref mut stream = self.stream;
-
         let (method, path, headers, amt) = {
             let mut headers = [httparse::EMPTY_HEADER; 24];
             let mut req = httparse::Request::new(&mut headers);
-            let res = req.parse(&stream.reader)?;
+            let res = req.parse(&self.stream.reader)?;
 
             let amt = match res {
                 httparse::Status::Complete(amt) => amt,
@@ -51,22 +47,18 @@ impl<'a> Http<'a> {
             (method, path, headers, amt)
         };
 
-        let remote_addr = stream.remote_addr();
+        let remote_addr = self.stream.remote_addr();
 
         Ok(Request::new(
             method.parse().unwrap(),
             path,
             headers,
             remote_addr,
-            stream.reader.split_off(amt)
+            self.stream.reader.split_off(amt)
         ))
     }
 
     pub fn encode(&mut self, response: Response) {
-        //let mut stream = self.stream.lock().unwrap();
-
-        let ref mut stream = self.stream;
-
         let mut data = Vec::new();
 
         write!(data, "HTTP/1.1 {} {}\r\n", response.status_code.0, response.status_code.default_reason_phrase()).unwrap();
@@ -83,7 +75,7 @@ impl<'a> Http<'a> {
 
         write!(data, "\r\n").unwrap();
 
-        stream.write(&data).unwrap();
-        stream.write(&response.data).unwrap();
+        self.stream.write(&data).unwrap();
+        self.stream.write(&response.data).unwrap();
     }
 }

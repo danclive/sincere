@@ -1,5 +1,5 @@
 use std::net::ToSocketAddrs;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::usize;
 
 use soio::tcp::TcpListener;
@@ -15,7 +15,6 @@ use self::process::Process;
 use self::worker::Worker;
 use self::connection::Connection;
 
-//pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync>;
 pub type Handle = Box<Fn(&mut Stream) + Send + Sync>;
 
 mod stream;

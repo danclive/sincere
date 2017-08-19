@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use regex::Regex;
 
 use server::Server;
