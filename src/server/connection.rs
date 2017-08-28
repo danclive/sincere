@@ -119,6 +119,7 @@ impl Connection {
 
             if next {
                 tls_session.write_all(&mut self.stream.writer).unwrap();
+                self.stream.writer.clear();
             }
 
             let rd = tls_session.wants_read();

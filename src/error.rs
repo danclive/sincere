@@ -4,6 +4,7 @@ use std::fmt;
 use std::error;
 use std::sync::mpsc::TryRecvError;
 use std::string::FromUtf8Error;
+use std::num::ParseIntError;
 
 use soio::channel::SendError;
 use soio::tcp::TcpStream;
@@ -22,6 +23,7 @@ pub enum Error {
     ReceiveSocketError(TryRecvError),
     FromUtf8Error(FromUtf8Error),
     HttpParseError(httparse::Error),
+    ParseIntError(ParseIntError),
     Error(String),
 }
 
@@ -55,6 +57,12 @@ impl From<FromUtf8Error> for Error {
     }
 }
 
+impl From<ParseIntError> for Error {
+    fn from(err: ParseIntError) -> Self {
+        Error::ParseIntError(err)
+    }
+}
+
 impl From<httparse::Error> for Error {
     fn from(err: httparse::Error) -> Self {
         Error::HttpParseError(err)
@@ -70,6 +78,7 @@ impl fmt::Display for Error {
             Error::ReceiveSocketError(ref inner) => inner.fmt(fmt),
             Error::FromUtf8Error(ref inner) => inner.fmt(fmt),
             Error::HttpParseError(ref inner) => inner.fmt(fmt),
+            Error::ParseIntError(ref inner) => inner.fmt(fmt),
             Error::Error(ref inner) => inner.fmt(fmt),
         }
     }
@@ -84,6 +93,7 @@ impl error::Error for Error {
             Error::ReceiveSocketError(ref err) => err.description(),
             Error::FromUtf8Error(ref err) => err.description(),
             Error::HttpParseError(ref err) => err.description(),
+            Error::ParseIntError(ref err) => err.description(),
             Error::Error(ref err) => err,
         }
     }
@@ -96,6 +106,7 @@ impl error::Error for Error {
             Error::ReceiveSocketError(ref err) => Some(err),
             Error::FromUtf8Error(ref err) => Some(err),
             Error::HttpParseError(ref err) => Some(err),
+            Error::ParseIntError(ref err) => Some(err),
             Error::Error(_) => None,
         }
     }
