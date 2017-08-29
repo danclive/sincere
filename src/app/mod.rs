@@ -83,7 +83,7 @@ impl App {
         let mut http = Http::new(stream);
 
         match http.decode() {
-            Ok(request) => {
+            Ok(Some(request)) => {
 
                 let mut context = Context::new(request);
 
@@ -182,6 +182,10 @@ impl App {
 
                 http.encode(context.response);
 
+            }
+            Ok(None) => {
+                let response = Response::empty(100);
+                http.encode(response);
             }
             Err(err) => {
                 let response = Response::empty(501);

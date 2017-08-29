@@ -15,7 +15,7 @@ pub struct Request {
     params: HashMap<String, String>,
     querys: HashMap<String, String>,
     remote_addr: SocketAddr,
-    data: Vec<u8>,
+    data: Vec<u8>
 }
 
 impl Request {
@@ -27,7 +27,7 @@ impl Request {
             params: HashMap::new(),
             querys: HashMap::new(),
             remote_addr: remote_addr,
-            data: data,
+            data: data
         }
     }
 

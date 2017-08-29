@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::str::FromStr;
 
 use httparse;
 
@@ -29,7 +30,7 @@ impl<'a> Http<'a> {
         }
     }
 
-    pub fn decode(&mut self) -> Result<Request> {
+    pub fn decode(&mut self) -> Result<Option<Request>> {
         let (method, path, headers, amt) = {
             let mut headers = [httparse::EMPTY_HEADER; 24];
             let mut req = httparse::Request::new(&mut headers);
@@ -49,13 +50,26 @@ impl<'a> Http<'a> {
 
         let remote_addr = self.stream.remote_addr();
 
-        Ok(Request::new(
+        let request = Request::new(
             method.parse().unwrap(),
             path,
             headers,
             remote_addr,
             self.stream.reader.split_off(amt)
-        ))
+        );
+
+        if let Some(len) = request.get_header("Content-Length") {
+            let len: usize = usize::from_str(&len)?;
+            if len > request.data_length() {
+                return Ok(None)
+            } else {
+                self.stream.reader.clear();
+            }
+        } else {
+            self.stream.reader.clear();
+        }
+
+        Ok(Some(request))
     }
 
     pub fn encode(&mut self, response: Response) {
