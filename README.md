@@ -5,23 +5,22 @@ Sincere is http server and micro web framework for Rust(stable) based on epoll, 
 ```rust
 extern crate sincere;
 
-use sincere::Micro;
+use sincere::App;
 
 fn main() {
-    let mut app = Micro::new();
+    let mut app = App::new();
 
-    app.get("/", |request, response| {
-        println!("{:?}", request.headers);
-        response.from_text("Hello Sincere");
+    app.get("/", |context| {
+        context.response.from_text("Hello world!").unwrap();
     });
 
-    app.run("127.0.0.1:8000");
+    app.run("127.0.0.1:8000", 4);
 }
 ```
 Don't forget add this to your `Cargo.toml`:
 
 ```
 [dependencies]
-sincere = { git = "https://github.com/dangcheng/sincere" }
+sincere = "0.3"
 ```
-Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello Sincere` on the screen.
+Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello world` on the screen.
