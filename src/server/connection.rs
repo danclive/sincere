@@ -96,7 +96,6 @@ impl Connection {
 
             let next = {
                 self.stream.remote_addr = self.socket.peer_addr().unwrap();
-
                 if tls_session.read_to_end(&mut self.stream.reader).is_err() {
                     self.close = true;
                     return;

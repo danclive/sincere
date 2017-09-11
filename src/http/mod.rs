@@ -50,24 +50,23 @@ impl<'a> Http<'a> {
 
         let remote_addr = self.stream.remote_addr();
 
-        let request = Request::new(
+        let mut request = Request::new(
             method.parse().unwrap(),
             path,
             headers,
             remote_addr,
-            self.stream.reader.split_off(amt)
+            Vec::new()
         );
 
         if let Some(len) = request.get_header("Content-Length") {
             let len: usize = usize::from_str(&len)?;
-            if len > request.data_length() {
+            if len > self.stream.reader.len() - amt {
                 return Ok(None)
-            } else {
-                self.stream.reader.clear();
             }
-        } else {
-            self.stream.reader.clear();
         }
+
+        request.data = self.stream.reader.split_off(amt);
+        self.stream.reader.clear();
 
         Ok(Some(request))
     }

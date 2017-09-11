@@ -15,7 +15,7 @@ pub struct Request {
     params: HashMap<String, String>,
     querys: HashMap<String, String>,
     remote_addr: SocketAddr,
-    data: Vec<u8>
+    pub data: Vec<u8>
 }
 
 impl Request {
