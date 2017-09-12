@@ -6,8 +6,6 @@ use soio::tcp::TcpListener;
 use soio::tcp::TcpStream;
 use soio::{Events, Poll, Token, Ready, PollOpt};
 
-use rustls;
-
 use error::Result;
 
 pub use self::stream::Stream;
@@ -21,6 +19,7 @@ mod stream;
 mod process;
 mod worker;
 mod connection;
+mod tlsconfig;
 
 const SERVER: Token = Token(0);
 
@@ -66,7 +65,7 @@ impl Server {
     }
 
     pub fn run_tls(&mut self, handle: Handle, process_num: usize, cert: &str, private_key: &str) -> Result<()> {
-        let tls_config = make_config(cert, private_key);
+        let tls_config = tlsconfig::TlsConfig::new(cert, private_key).make_config();
 
         let handle = Arc::new(handle);
 
@@ -111,35 +110,4 @@ impl Server {
 
         Ok(())
     }
-}
-
-
-use std::fs;
-use std::io::BufReader;
-
-fn load_certs(filename: &str) -> Vec<rustls::Certificate> {
-    let certfile = fs::File::open(filename).expect("cannot open certificate file");
-    let mut reader = BufReader::new(certfile);
-    rustls::internal::pemfile::certs(&mut reader).unwrap()
-}
-
-fn load_private_key(filename: &str) -> rustls::PrivateKey {
-    let keyfile = fs::File::open(filename).expect("cannot open private key file");
-    let mut reader = BufReader::new(keyfile);
-    let keys = rustls::internal::pemfile::rsa_private_keys(&mut reader).unwrap();
-    assert!(keys.len() == 1);
-    keys[0].clone()
-}
-
-fn make_config(cert: &str, private_key: &str) -> Arc<rustls::ServerConfig> {
-    let cert = load_certs(cert);
-    let privkey = load_private_key(private_key);
-
-    let mut config = rustls::ServerConfig::new();
-    config.set_single_cert(cert, privkey);
-
-    let session_memory_cache = rustls::ServerSessionMemoryCache::new(256);
-    config.set_persistence(session_memory_cache);
-
-    Arc::new(config)
 }
