@@ -7,7 +7,7 @@ use http::Http;
 use http::Response;
 pub use self::route::Route;
 pub use self::group::Group;
-pub use self::context::Context;
+pub use self::context::{Context, Value};
 use self::middleware::Middleware;
 use error::Result;
 

@@ -8,21 +8,21 @@ pub use serde::de::value::Error;
 
 
 pub struct Decoder<'de> {
-	inner: MapDeserializer<'de, PartIterator<'de>, Error>
+    inner: MapDeserializer<'de, PartIterator<'de>, Error>
 }
 
 impl<'de> Decoder<'de> {
-	pub fn new(parser: Parse<'de>) -> Self {
-		Decoder {
-			inner: MapDeserializer::new(PartIterator(parser))
-		}
-	}
+    pub fn new(parser: Parse<'de>) -> Self {
+        Decoder {
+            inner: MapDeserializer::new(PartIterator(parser))
+        }
+    }
 }
 
 impl<'de> de::Deserializer<'de> for Decoder<'de> {
-	type Error = Error;
+    type Error = Error;
 
-	fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where V: de::Visitor<'de>
     {
         self.deserialize_map(visitor)
@@ -79,21 +79,21 @@ impl<'de> de::Deserializer<'de> for Decoder<'de> {
 struct PartIterator<'de>(Parse<'de>);
 
 impl<'de> Iterator for PartIterator<'de> {
-	type Item = (Part<'de>, Part<'de>);
+    type Item = (Part<'de>, Part<'de>);
 
-	fn next(&mut self) -> Option<Self::Item> {
-		self.0.next().map(|(k, v)| (Part(k), Part(v)))
-	}
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(k, v)| (Part(k), Part(v)))
+    }
 }
 
 struct Part<'de>(Cow<'de, str>);
 
 impl<'de> IntoDeserializer<'de> for Part<'de> {
-	type Deserializer = Self;
+    type Deserializer = Self;
 
-	fn into_deserializer(self) -> Self::Deserializer {
-		self
-	}
+    fn into_deserializer(self) -> Self::Deserializer {
+        self
+    }
 }
 
 macro_rules! forward_parsed_value {
@@ -112,21 +112,21 @@ macro_rules! forward_parsed_value {
 }
 
 impl<'de> de::Deserializer<'de> for Part<'de> {
-	type Error = Error;
+    type Error = Error;
 
-	fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-		where V: de::Visitor<'de>
-	{
-		self.0.into_deserializer().deserialize_any(visitor)
-	}
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where V: de::Visitor<'de>
+    {
+        self.0.into_deserializer().deserialize_any(visitor)
+    }
 
-	fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where V: de::Visitor<'de>
     {
         visitor.visit_some(self)
     }
 
-	forward_to_deserialize_any! {
+    forward_to_deserialize_any! {
         char
         str
         string
