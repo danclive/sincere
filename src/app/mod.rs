@@ -70,6 +70,12 @@ impl App {
     middleware!(after);
     middleware!(finish);
 
+    pub fn use_middleware<F>(&mut self, func: F)
+        where F: Fn(&mut App)
+    {
+        func(self)
+    }
+
     pub fn not_found<H>(&mut self, handle: H)
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
