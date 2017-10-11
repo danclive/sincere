@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::time::Instant;
+
 use http::Request;
 use http::Response;
 
@@ -41,6 +43,7 @@ pub enum Value {
     Map(HashMap<Value, Value>),
     Boolean(bool),
     Binary(Vec<u8>),
+    Instant(Instant)
 }
 
 impl Value {
@@ -110,6 +113,13 @@ impl Value {
     pub fn as_binary(&self) -> Option<&Vec<u8>> {
         match *self {
             Value::Binary(ref i) => Some(i),
+            _ => None
+        }
+    }
+
+    pub fn as_instant(&self) -> Option<&Instant> {
+        match *self {
+            Value::Instant(ref i) => Some(i),
             _ => None
         }
     }
