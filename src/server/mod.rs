@@ -28,6 +28,8 @@ pub struct Server {
     events: Events,
     poll: Poll,
     process: Vec<Process>,
+    process_num: usize,
+    process_pos: usize,
     run: bool,
 }
 
@@ -38,11 +40,14 @@ impl Server {
             events: Events::with_capacity(1024),
             poll: Poll::new()?,
             process: Vec::new(),
+            process_num: 0,
+            process_pos: 0,
             run: true,
         })
     }
 
     pub fn run(&mut self, handle: Handle, process_num: usize) -> Result<()> {
+        self.process_num = process_num;
 
         let handle = Arc::new(handle);
 
@@ -66,6 +71,7 @@ impl Server {
 
     pub fn run_tls(&mut self, handle: Handle, process_num: usize, cert: &str, private_key: &str) -> Result<()> {
         let tls_config = tlsconfig::TlsConfig::new(cert, private_key).make_config();
+        self.process_num = process_num;
 
         let handle = Arc::new(handle);
 
@@ -88,9 +94,11 @@ impl Server {
     }
 
     pub fn run_once(&mut self) -> Result<()> {
-        self.poll.poll(&mut self.events, None)?;
+        let events_num = self.poll.poll(&mut self.events, None)?;
 
-        for event in self.events.iter() {
+        for i in 0..events_num {
+            let event = self.events.get(i).unwrap();
+
             if event.token() == SERVER && event.readiness() == Ready::readable() {
                 let (socket, _) = self.listener.accept()?;
                 self.dispense(socket)?;
@@ -100,13 +108,15 @@ impl Server {
         Ok(())
     }
 
-    fn dispense(&self, socket: TcpStream) -> Result<()> {
-        let mut pro: Vec<(usize, usize)> = self.process.iter().enumerate().map(|(n, ref p)| { (n, p.active()) }).collect();
-        pro.sort_by(|&(_, a), &(_, b)| a.cmp(&b));
+    fn dispense(&mut self, socket: TcpStream) -> Result<()> {
 
-        let (nim, _) = pro[0];
+        self.process.get(self.process_pos).expect("bug!").send(socket)?;
 
-        self.process.get(nim).expect("don't send").send(socket)?;
+        self.process_pos += 1;
+
+        if self.process_pos >= self.process_num {
+            self.process_pos = 0;
+        }
 
         Ok(())
     }

@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::usize;
 
 use soio::tcp::TcpStream;
@@ -18,7 +17,6 @@ const CHANNEL: Token = Token(usize::MAX - 1);
 pub struct Worker {
     rx: Receiver<TcpStream>,
     sockets: Vec<Option<Connection>>,
-    active: Arc<AtomicUsize>,
     handle: Arc<Handle>,
     tls_config: Option<Arc<rustls::ServerConfig>>,
 }
@@ -26,7 +24,6 @@ pub struct Worker {
 impl Worker {
     pub fn new(
         rx: Receiver<TcpStream>,
-        active: Arc<AtomicUsize>,
         handle: Arc<Handle>,
         tls_config: Option<Arc<rustls::ServerConfig>>
     ) -> Worker {
@@ -39,7 +36,6 @@ impl Worker {
         Worker {
             rx: rx,
             sockets: sockets,
-            active: active,
             handle: handle,
             tls_config: tls_config,
         }
@@ -94,7 +90,6 @@ impl Worker {
                             }
 
                             *find = Some(conn);
-                            self.active.fetch_add(1, Ordering::Release);
                         } else {
                             panic!("bug");
                         }
@@ -156,7 +151,6 @@ impl Worker {
                                 }
 
                                 *find = None;
-                                self.active.fetch_sub(1, Ordering::Release);
                             }
                         }
                     }
