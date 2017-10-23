@@ -2,9 +2,9 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::usize;
 
-use soio::tcp::TcpListener;
-use soio::tcp::TcpStream;
-use soio::{Events, Poll, Token, Ready, PollOpt};
+use queen::tcp::TcpListener;
+use queen::tcp::TcpStream;
+use queen::{Events, Poll, Token, Ready, PollOpt};
 
 use error::Result;
 

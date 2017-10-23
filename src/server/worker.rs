@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::usize;
 
-use soio::tcp::TcpStream;
-use soio::channel::Receiver;
-use soio::{Poll, Ready, PollOpt, Events, Token};
+use queen::tcp::TcpStream;
+use queen::channel::Receiver;
+use queen::{Poll, Ready, PollOpt, Events, Token};
 
 use rustls;
 

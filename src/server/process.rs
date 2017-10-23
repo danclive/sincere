@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::thread;
 
-use soio::channel::{self, Sender};
-use soio::tcp::TcpStream;
+use queen::channel::{self, Sender};
+use queen::tcp::TcpStream;
 
 use rustls;
 
@@ -17,7 +17,7 @@ pub struct Process {
 
 impl Process {
     pub fn new(handle: Arc<Handle>, tls_config: Option<Arc<rustls::ServerConfig>>) -> Result<Process> {
-        let (tx, rx) = channel::channel();
+        let (tx, rx) = channel::channel()?;
 
         thread::spawn(move || {
             match tls_config {

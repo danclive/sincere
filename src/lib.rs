@@ -1,4 +1,4 @@
-extern crate soio;
+extern crate queen;
 extern crate chrono;
 extern crate regex;
 extern crate rustls;

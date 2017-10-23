@@ -2,8 +2,8 @@ use std::io::{Read, Write};
 use std::io::ErrorKind::WouldBlock;
 use std::sync::Arc;
 
-use soio::tcp::TcpStream;
-use soio::Ready;
+use queen::tcp::TcpStream;
+use queen::Ready;
 
 use rustls::{self, Session};
 
