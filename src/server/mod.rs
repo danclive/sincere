@@ -9,16 +9,10 @@ use queen::{Events, Poll, Token, Ready, PollOpt};
 use error::Result;
 
 pub use self::stream::Stream;
-use self::process::Process;
-use self::worker::Worker;
-use self::connection::Connection;
 
 pub type Handle = Box<Fn(&mut Stream) + Send + Sync>;
 
 mod stream;
-mod process;
-mod worker;
-mod connection;
 mod tlsconfig;
 
 const SERVER: Token = Token(0);
