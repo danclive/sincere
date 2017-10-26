@@ -1,121 +1,252 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::net::ToSocketAddrs;
-use std::sync::Arc;
-use std::usize;
+use std::io::{self, ErrorKind};
+use std::sync::mpsc::TryRecvError;
+use std::rc::Rc;
 
+use rustls;
+
+use queen::Token;
+use queen::Poll;
+use queen::Ready;
+use queen::PollOpt;
+use queen::channel::{self, Receiver, Sender};
+use queen::Events;
+use queen::Event;
 use queen::tcp::TcpListener;
-use queen::tcp::TcpStream;
-use queen::{Events, Poll, Token, Ready, PollOpt};
+use queen::Evented;
 
+//use threading::Pool;
+use util::threadpool::Pool;
+
+use self::connection::Connection;
+pub use self::stream::Stream;
 use error::Result;
 
-pub use self::stream::Stream;
-use self::process::Process;
-use self::worker::Worker;
-use self::connection::Connection;
-
-pub type Handle = Box<Fn(&mut Stream) + Send + Sync>;
-
-mod stream;
-mod process;
-mod worker;
 mod connection;
+mod stream;
 mod tlsconfig;
 
 const SERVER: Token = Token(0);
+const CHANNEL: Token = Token(1);
+
+pub type Handle = Box<Fn(Arc<Mutex<Stream>>) + Send + Sync + 'static>;
 
 pub struct Server {
     listener: TcpListener,
-    events: Events,
+    conns: HashMap<Token, Connection>,
+    token: usize,
+    handle: Arc<Handle>,
     poll: Poll,
-    process: Vec<Process>,
-    process_num: usize,
-    process_pos: usize,
+    events: Events,
+    thread_pool: Rc<Pool>,
+    tx: Sender<connection::Event>,
+    rx: Receiver<connection::Event>,
     run: bool,
+    tls_config: Option<Arc<rustls::ServerConfig>>,
 }
 
 impl Server {
     pub fn new<A: ToSocketAddrs>(addr: A) -> Result<Server> {
+        let (tx, rx) = channel::channel::<connection::Event>()?;
+
         Ok(Server {
             listener: TcpListener::bind(addr)?,
+            conns: HashMap::with_capacity(1024),
+            token: 4,
+            handle: Arc::new(Box::new(|_| {})),
+            poll: Poll::new().unwrap(),
             events: Events::with_capacity(1024),
-            poll: Poll::new()?,
-            process: Vec::new(),
-            process_num: 0,
-            process_pos: 0,
+            thread_pool: Rc::new(Pool::new()),
+            tx: tx,
+            rx: rx,
             run: true,
+            tls_config: None,
         })
     }
 
-    pub fn run(&mut self, handle: Handle, process_num: usize) -> Result<()> {
-        self.process_num = process_num;
+    fn token(&mut self) -> Token {
+        self.token += 1;
+        Token(self.token)
+    }
 
-        let handle = Arc::new(handle);
+    fn accept(&mut self) -> Result<()> {
+        let (socket, _) = self.listener.accept()?;
 
-        for _ in 0..process_num {
-            self.process.push(Process::new(handle.clone(), None)?);
-        }
+        let thread_pool = self.thread_pool.clone();
+        let tx = self.tx.clone();
+        let token = self.token();
+
+        let handle = self.handle.clone();
 
         self.poll.register(
-            &self.listener,
-            SERVER,
-            Ready::readable(),
-            PollOpt::level()
+            &socket, token,
+            Ready::readable() | Ready::hup(),
+            PollOpt::edge() | PollOpt::oneshot()
         )?;
 
-        while self.run {
-            self.run_once()?;
+        match self.tls_config {
+            Some(ref tls_config) => {
+                let tls_session = rustls::ServerSession::new(tls_config);
+                self.conns.insert(
+                    token,
+                    Connection::new(socket, token, thread_pool, tx, handle, Some(tls_session))
+                );
+            },
+            None => {
+                self.conns.insert(
+                    token,
+                    Connection::new(socket, token, thread_pool, tx, handle, None)
+                );
+            },
         }
 
         Ok(())
     }
 
-    pub fn run_tls(&mut self, handle: Handle, process_num: usize, cert: &str, private_key: &str) -> Result<()> {
-        let tls_config = tlsconfig::TlsConfig::new(cert, private_key).make_config();
-        self.process_num = process_num;
-
-        let handle = Arc::new(handle);
-
-        for _ in 0..process_num {
-            self.process.push(Process::new(handle.clone(), Some(tls_config.clone()))?);
-        }
-
-        self.poll.register(
-            &self.listener,
-            SERVER,
-            Ready::readable(),
-            PollOpt::level()
-        )?;
-
-        while self.run {
-            self.run_once()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn run_once(&mut self) -> Result<()> {
-        let events_num = self.poll.poll(&mut self.events, None)?;
-
-        for i in 0..events_num {
-            let event = self.events.get(i).unwrap();
-
-            if event.token() == SERVER && event.readiness() == Ready::readable() {
-                let (socket, _) = self.listener.accept()?;
-                self.dispense(socket)?;
+    fn channel(&mut self) -> Result<()> {
+        loop {
+            match self.rx.try_recv() {
+                Ok(event) => {
+                    match event {
+                        connection::Event::Write(token) => {
+                            if let Some(conn) = self.conns.get(&token) {
+                                conn.reregister(
+                                    &self.poll, token,
+                                    Ready::writable() | Ready::hup(),
+                                    PollOpt::edge() | PollOpt::oneshot()
+                                )?;
+                            }
+                        },
+                        connection::Event::Read(token) => {
+                            if let Some(conn) = self.conns.get(&token) {
+                                conn.reregister(
+                                    &self.poll, token,
+                                    Ready::readable() | Ready::hup(),
+                                    PollOpt::edge() | PollOpt::oneshot()
+                                )?;
+                            }
+                        },
+                        connection::Event::WriteTls(token) => {
+                            if let Some(conn) = self.conns.get_mut(&token) {
+                                conn.write_to_tls();
+                            }
+                        },
+                    }
+                },
+                Err(err) => {
+                    match err {
+                        TryRecvError::Empty => break,
+                        TryRecvError::Disconnected => return Err(
+                            io::Error::new(ErrorKind::ConnectionAborted, err).into()
+                        ),
+                    }
+                }
             }
         }
 
         Ok(())
     }
 
-    fn dispense(&mut self, socket: TcpStream) -> Result<()> {
+    fn connect(&mut self, event: Event ,token: Token) -> Result<()> {
 
-        self.process.get(self.process_pos).expect("bug!").send(socket)?;
+        if event.readiness().is_hup() || event.readiness().is_error() {
+           if let Some(conn) = self.conns.remove(&token) {
+                conn.deregister(&self.poll)?;
+                return Ok(())
+            }
+        }
 
-        self.process_pos += 1;
+        if event.readiness().is_readable() {
+            let mut close = false;
 
-        if self.process_pos >= self.process_num {
-            self.process_pos = 0;
+            if let Some(conn) = self.conns.get_mut(&token) {
+                conn.reader();
+                close = conn.closing;
+            }
+
+            if close {
+                if let Some(conn) = self.conns.remove(&token) {
+                    conn.deregister(&self.poll)?;
+                    conn.shutdown();
+                }
+            }
+        }
+
+        if event.readiness().is_writable() {
+            let mut close = false;
+
+            if let Some(conn) = self.conns.get_mut(&token) {
+                conn.writer();
+                close =  conn.closing;
+            }
+
+            if close {
+                if let Some(conn) = self.conns.remove(&token) {
+                    conn.deregister(&self.poll)?;
+                    conn.shutdown();
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn event(&mut self, event: Event) -> Result<()> {
+        match event.token() {
+            SERVER => {
+                self.accept()
+            },
+            CHANNEL => {
+                self.channel()
+            },
+            token => {
+                self.connect(event, token)
+            }
+        }
+    }
+
+    pub fn run_once(&mut self) -> Result<()> {
+        let size = self.poll.poll(&mut self.events, None)?;
+
+        for i in 0..size {
+            let event = self.events.get(i).unwrap();
+            self.event(event)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run(&mut self, handle: Handle) -> Result<()> {
+        self.handle = Arc::new(handle);
+
+        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::level())?;
+
+        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::level())?;
+
+        self.run = true;
+
+        while self.run {
+            self.run_once()?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run_tls(&mut self, handle: Handle, cert: &str, private_key: &str) -> Result<()> {
+        self.tls_config = Some(tlsconfig::TlsConfig::new(cert, private_key).make_config());
+
+        self.handle = Arc::new(handle);
+
+        self.poll.register(&self.listener, SERVER, Ready::readable(), PollOpt::level())?;
+
+        self.poll.register(&self.rx, CHANNEL, Ready::readable(), PollOpt::level())?;
+
+        self.run = true;
+
+        while self.run {
+            self.run_once()?;
         }
 
         Ok(())

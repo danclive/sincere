@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use regex::Regex;
 
 use server::Server;
@@ -84,7 +86,7 @@ impl App {
         });
     }
 
-    pub fn handle(&self, stream: &mut Stream) {
+    pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
 
         let mut http = Http::new(stream);
 
@@ -201,23 +203,23 @@ impl App {
         }
     }
 
-    pub fn run(self, addr: &str, process_num: usize) -> Result<()> {
+    pub fn run(self, addr: &str) -> Result<()> {
 
         let mut server = Server::new(addr).unwrap();
 
         server.run(Box::new(move |stream| {
             self.handle(stream);
-        }), process_num)?;
+        }))?;
 
         Ok(())
     }
 
-    pub fn run_tls(self, addr: &str, process_num: usize, cert: &str, private_key: &str) -> Result<()> {
+    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
         let mut server = Server::new(addr).unwrap();
 
         server.run_tls(Box::new(move |stream| {
             self.handle(stream);
-        }), process_num ,cert, private_key)?;
+        }), cert, private_key)?;
 
         Ok(())
     }
