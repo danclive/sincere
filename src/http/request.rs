@@ -20,7 +20,7 @@ pub struct Request {
 
 impl Request {
     pub fn new(method: Method, path: String, headers: HashMap<String, String>, remote_addr: SocketAddr, data: Vec<u8>) -> Request {
-        Request {
+        let mut request = Request {
             method: method,
             path: path,
             headers: headers,
@@ -28,7 +28,11 @@ impl Request {
             querys: HashMap::new(),
             remote_addr: remote_addr,
             data: data
-        }
+        };
+
+        request.decode_query();
+
+        request
     }
 
     pub fn method(&self) -> &Method {
@@ -80,17 +84,13 @@ impl Request {
         }
     }
 
-    pub fn querys(&mut self) -> &mut HashMap<String, String> {
-        self.decode_query();
-
-        &mut self.querys
+    pub fn querys(&self) -> &HashMap<String, String> {
+        &self.querys
     }
 
-    pub fn get_query<'a, S>(&mut self, key: S) -> Option<String>
+    pub fn get_query<'a, S>(&self, key: S) -> Option<String>
         where S: Into<&'a str>
     {
-        self.decode_query();
-
         self.querys.get(key.into()).map(|v| v.to_string())
     }
 
