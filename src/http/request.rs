@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::net::SocketAddr;
 
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -14,19 +13,17 @@ pub struct Request {
     headers: HashMap<String, String>,
     params: HashMap<String, String>,
     querys: HashMap<String, String>,
-    remote_addr: SocketAddr,
     pub data: Vec<u8>
 }
 
 impl Request {
-    pub fn new(method: Method, path: String, headers: HashMap<String, String>, remote_addr: SocketAddr, data: Vec<u8>) -> Request {
+    pub fn new(method: Method, path: String, headers: HashMap<String, String>, data: Vec<u8>) -> Request {
         let mut request = Request {
             method: method,
             path: path,
             headers: headers,
             params: HashMap::new(),
             querys: HashMap::new(),
-            remote_addr: remote_addr,
             data: data
         };
 
@@ -51,10 +48,6 @@ impl Request {
         where S: Into<&'a str>
     {
         self.headers.get(key.into()).map(|v| v.to_string())
-    }
-
-    pub fn remote_addr(&self) -> &SocketAddr {
-        &self.remote_addr
     }
 
     pub fn data_length(&self) -> usize {

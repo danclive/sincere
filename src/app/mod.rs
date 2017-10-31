@@ -1,11 +1,16 @@
-use std::sync::{Arc, Mutex};
+use std::io;
+use std::sync::Arc;
 
 use regex::Regex;
 
-use server::Server;
-use server::Stream;
+use futures::future;
+use tokio_service::Service;
+use tokio_proto::TcpServer;
+
+use num_cpus;
 
 use http::Http;
+use http::Request;
 use http::Response;
 pub use self::route::Route;
 pub use self::group::Group;
@@ -86,141 +91,173 @@ impl App {
         });
     }
 
-    pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
+    // pub fn run(self, addr: &str) -> Result<()> {
 
-        let mut http = Http::new(stream);
+    //     let mut server = Server::new(addr).unwrap();
 
-        match http.decode() {
-            Ok(Some(request)) => {
+    //     server.run(Box::new(move |stream| {
+    //         self.handle(stream);
+    //     }))?;
 
-                let mut context = Context::new(request);
+    //     Ok(())
+    // }
 
-                let mut route_found = false;
+    // pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
+    //     let mut server = Server::new(addr).unwrap();
 
-                for begin in self.begin.iter() {         
-                    begin.execute_always(&mut context);
-                }
+    //     server.run_tls(Box::new(move |stream| {
+    //         self.handle(stream);
+    //     }), cert, private_key)?;
 
-                if context.next() {
+    //     Ok(())
+    // }
+    fn handle(&self, mut context: &mut Context) {
 
-                    'outer: for group in self.groups.iter() {
+        let mut route_found = false;
 
-                        for route in group.routes.iter() {
+        for begin in self.begin.iter() {         
+            begin.execute_always(&mut context);
+        }
 
-                            if route.method() != context.request.method() {
-                                continue;
-                            }
+        if context.next() {
 
-                            let path = {
-                                let path = context.request.path();
-                                let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
-                                if path != "/" {
-                                    path.trim_right_matches('/').to_owned()
-                                } else {
-                                    path.to_owned()
-                                }
-                            };
+            'outer: for group in self.groups.iter() {
 
-                            let pattern = {
-                                let pattern = route.compilied_pattern();
-                                if pattern != "/" {
-                                    pattern.trim_right_matches('/').to_owned()
-                                } else {
-                                    pattern
-                                }
-                            };
+                for route in group.routes.iter() {
 
-                            if pattern.contains("^") {
-                                let re = Regex::new(&pattern).unwrap();
-                                let caps = re.captures(&path);
-
-                                if let Some(caps) = caps {
-                                    route_found = true;
-
-                                    let matches = route.path();
-
-                                    for (key, value) in matches.iter() {
-                                        context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
-                                    }
-                                }
-                            } else {
-                                if pattern == path {
-                                    route_found = true;
-                                }
-                            }
-
-                            if route_found {
-                                
-                                for before in self.before.iter() {
-                                    before.execute(&mut context);
-                                }
-
-                                for before in group.before.iter() {
-                                    before.execute(&mut context);
-                                }
-
-                                route.execute(&mut context);
-
-                                for after in group.after.iter() {
-                                    after.execute(&mut context);
-                                }
-
-                                for after in self.after.iter() {
-                                    after.execute(&mut context);
-                                }
-
-                                break 'outer;
-                            }
-                        }
+                    if route.method() != context.request.method() {
+                        continue;
                     }
 
-                    if !route_found {
-                        if let Some(ref not_found) = self.not_found {
-                            not_found.execute(&mut context);
+                    let path = {
+                        let path = context.request.path();
+                        let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
+                        if path != "/" {
+                            path.trim_right_matches('/').to_owned()
                         } else {
-                            context.response.status(404).from_text("Not Found").unwrap();
+                            path.to_owned()
+                        }
+                    };
+
+                    let pattern = {
+                        let pattern = route.compilied_pattern();
+                        if pattern != "/" {
+                            pattern.trim_right_matches('/').to_owned()
+                        } else {
+                            pattern
+                        }
+                    };
+
+                    if pattern.contains("^") {
+                        let re = Regex::new(&pattern).unwrap();
+                        let caps = re.captures(&path);
+
+                        if let Some(caps) = caps {
+                            route_found = true;
+
+                            let matches = route.path();
+
+                            for (key, value) in matches.iter() {
+                                context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                            }
+                        }
+                    } else {
+                        if pattern == path {
+                            route_found = true;
                         }
                     }
 
+                    if route_found {
+                                
+                        for before in self.before.iter() {
+                            before.execute(&mut context);
+                        }
+
+                        for before in group.before.iter() {
+                            before.execute(&mut context);
+                        }
+
+                        route.execute(&mut context);
+
+                        for after in group.after.iter() {
+                            after.execute(&mut context);
+                        }
+
+                        for after in self.after.iter() {
+                            after.execute(&mut context);
+                        }
+
+                        break 'outer;
+                    }
                 }
+            }
 
-                for finish in self.finish.iter() {
-                    finish.execute_always(&mut context);
+            if !route_found {
+                if let Some(ref not_found) = self.not_found {
+                    not_found.execute(&mut context);
+                } else {
+                    context.response.status(404).from_text("Not Found").unwrap();
                 }
+            }
 
-                http.encode(context.response);
+        }
 
-            }
-            Ok(None) => {
-                let response = Response::empty(100);
-                http.encode(response);
-            }
-            Err(err) => {
-                let response = Response::empty(501);
-                http.encode(response);
-                println!("http paser{:?}", err);
-            }
+        for finish in self.finish.iter() {
+            finish.execute_always(&mut context);
         }
     }
 
-    pub fn run(self, addr: &str) -> Result<()> {
+    // pub fn run(&self) {
+    //     let addr = "0.0.0.0:8000".parse().unwrap();
+    //     let mut server = TcpServer::new(Http, addr);
+    //     server.threads(num_cpus::get());
 
-        let mut server = Server::new(addr).unwrap();
+    //     server.serve(move ||{ Ok(self) });
+    // }
+}
 
-        server.run(Box::new(move |stream| {
-            self.handle(stream);
-        }))?;
+struct AppServer<'a> {
+    pub inner: &'a App
+}
 
-        Ok(())
+impl<'a> Service for AppServer<'a> {
+    type Request = Request;
+    type Response = Response;
+    type Error = io::Error;
+    type Future = future::Ok<Response, io::Error>;
+
+    fn call(&self, request: Self::Request) -> Self::Future {
+        let mut context = Context::new(request);
+
+        self.inner.handle(&mut context);
+
+        future::ok(context.response)
     }
+}
 
-    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
-        let mut server = Server::new(addr).unwrap();
+// pub fn run(app: &App) {
+//     let addr = "0.0.0.0:8000".parse().unwrap();
+//     let mut server = TcpServer::new(Http, addr);
+//     server.threads(num_cpus::get());
 
-        server.run_tls(Box::new(move |stream| {
-            self.handle(stream);
-        }), cert, private_key)?;
+//     let f = move ||{ Ok(app) };
 
-        Ok(())
-    }
+//     server.serve(f);
+// }
+
+// fn aaa() {
+//     let a = App::new();
+
+//     run(&a);
+// }
+
+
+pub fn run(app: &App) {
+    let addr = "0.0.0.0:8000".parse().unwrap();
+    let mut server = TcpServer::new(Http, addr);
+    server.threads(num_cpus::get());
+
+    
+
+    server.serve(move ||{ Ok(AppServer{inner: app}) });
 }
