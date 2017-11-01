@@ -5,6 +5,7 @@ use regex::Regex;
 
 use futures::future;
 use tokio_service::Service;
+use tokio_service::NewService;
 use tokio_proto::TcpServer;
 
 use num_cpus;
@@ -16,7 +17,6 @@ pub use self::route::Route;
 pub use self::group::Group;
 pub use self::context::{Context, Value};
 use self::middleware::Middleware;
-use error::Result;
 
 #[macro_use]
 mod macros;
@@ -91,26 +91,6 @@ impl App {
         });
     }
 
-    // pub fn run(self, addr: &str) -> Result<()> {
-
-    //     let mut server = Server::new(addr).unwrap();
-
-    //     server.run(Box::new(move |stream| {
-    //         self.handle(stream);
-    //     }))?;
-
-    //     Ok(())
-    // }
-
-    // pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
-    //     let mut server = Server::new(addr).unwrap();
-
-    //     server.run_tls(Box::new(move |stream| {
-    //         self.handle(stream);
-    //     }), cert, private_key)?;
-
-    //     Ok(())
-    // }
     fn handle(&self, mut context: &mut Context) {
 
         let mut route_found = false;
@@ -207,20 +187,27 @@ impl App {
         }
     }
 
-    // pub fn run(&self) {
-    //     let addr = "0.0.0.0:8000".parse().unwrap();
-    //     let mut server = TcpServer::new(Http, addr);
-    //     server.threads(num_cpus::get());
+    pub fn run(self, addr: &str) {
+        let addr = addr.parse().unwrap();
+        let mut server = TcpServer::new(Http, addr);
+        server.threads(num_cpus::get());
 
-    //     server.serve(move ||{ Ok(self) });
-    // }
+        let a = AppServer{
+            inner: Arc::new(self)
+        };
+
+        server.with_handle(move |_|{
+            a.clone()
+        });  
+    }
 }
 
-struct AppServer<'a> {
-    pub inner: &'a App
+#[derive(Clone)]
+struct AppServer {
+    pub inner: Arc<App>
 }
 
-impl<'a> Service for AppServer<'a> {
+impl Service for App {
     type Request = Request;
     type Response = Response;
     type Error = io::Error;
@@ -229,35 +216,18 @@ impl<'a> Service for AppServer<'a> {
     fn call(&self, request: Self::Request) -> Self::Future {
         let mut context = Context::new(request);
 
-        self.inner.handle(&mut context);
+        self.handle(&mut context);
 
         future::ok(context.response)
     }
 }
 
-// pub fn run(app: &App) {
-//     let addr = "0.0.0.0:8000".parse().unwrap();
-//     let mut server = TcpServer::new(Http, addr);
-//     server.threads(num_cpus::get());
-
-//     let f = move ||{ Ok(app) };
-
-//     server.serve(f);
-// }
-
-// fn aaa() {
-//     let a = App::new();
-
-//     run(&a);
-// }
-
-
-pub fn run(app: &App) {
-    let addr = "0.0.0.0:8000".parse().unwrap();
-    let mut server = TcpServer::new(Http, addr);
-    server.threads(num_cpus::get());
-
-    
-
-    server.serve(move ||{ Ok(AppServer{inner: app}) });
+impl NewService for AppServer {
+    type Request = Request;
+    type Response = Response;
+    type Error = io::Error;
+    type Instance = Arc<App>;
+    fn new_service(&self) -> io::Result<Self::Instance> {
+        Ok(self.inner.clone())
+    }
 }
