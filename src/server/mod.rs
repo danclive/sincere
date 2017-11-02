@@ -17,7 +17,6 @@ use queen::Event;
 use queen::tcp::TcpListener;
 use queen::Evented;
 
-//use threading::Pool;
 use util::threadpool::Pool;
 
 use self::connection::Connection;
@@ -158,35 +157,28 @@ impl Server {
             }
         }
 
+        let mut close = false;
+
         if event.readiness().is_readable() {
-            let mut close = false;
 
             if let Some(conn) = self.conns.get_mut(&token) {
                 conn.reader();
                 close = conn.closing;
             }
-
-            if close {
-                if let Some(conn) = self.conns.remove(&token) {
-                    conn.deregister(&self.poll)?;
-                    conn.shutdown();
-                }
-            }
         }
 
         if event.readiness().is_writable() {
-            let mut close = false;
 
             if let Some(conn) = self.conns.get_mut(&token) {
                 conn.writer();
                 close =  conn.closing;
             }
+        }
 
-            if close {
-                if let Some(conn) = self.conns.remove(&token) {
-                    conn.deregister(&self.poll)?;
-                    conn.shutdown();
-                }
+        if close {
+            if let Some(conn) = self.conns.remove(&token) {
+                conn.deregister(&self.poll)?;
+                conn.shutdown();
             }
         }
 
