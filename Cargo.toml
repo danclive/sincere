@@ -17,8 +17,7 @@ exclude       = [
 ]
 
 [dependencies]
-soio = "0.2"
-queen = { path = "../queen" }
+queen = "0.1"
 chrono = "0.4"
 regex = "0.2"
 rustls = "0.11"
