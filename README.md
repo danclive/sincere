@@ -1,6 +1,6 @@
 # Sincere
 
-Sincere is http server and micro web framework for Rust(stable) based on epoll, kqueue and multithreadind. Here is an example of a simple application:
+Sincere is http server and micro web framework for Rust(stable) based on epoll and multithreadind. Here is an example of a simple application:
 
 ```rust
 extern crate sincere;
@@ -14,7 +14,7 @@ fn main() {
         context.response.from_text("Hello world!").unwrap();
     });
 
-    app.run("127.0.0.1:8000", 4);
+    app.run("127.0.0.1:8000");
 }
 ```
 Don't forget add this to your `Cargo.toml`:
