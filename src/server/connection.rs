@@ -139,7 +139,7 @@ impl Connection {
                                     break;
                                 }
                             }
-                        },
+                        }
                         Err(err) => {
                             if let WouldBlock = err.kind() {
                                 break;

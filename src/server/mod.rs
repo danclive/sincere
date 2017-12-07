@@ -148,7 +148,7 @@ impl Server {
         Ok(())
     }
 
-    fn connect(&mut self, event: Event ,token: Token) -> Result<()> {
+    fn connect(&mut self, event: Event, token: Token) -> Result<()> {
 
         if event.readiness().is_hup() || event.readiness().is_error() {
            if let Some(conn) = self.conns.remove(&token) {
