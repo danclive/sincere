@@ -6,8 +6,8 @@ use std::sync::mpsc::TryRecvError;
 use std::string::FromUtf8Error;
 use std::num::ParseIntError;
 
-use queen::channel::SendError;
-use queen::tcp::TcpStream;
+use queen_io::channel::SendError;
+use queen_io::tcp::TcpStream;
 
 use serde_json;
 

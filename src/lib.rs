@@ -1,4 +1,4 @@
-extern crate queen;
+extern crate queen_io;
 extern crate chrono;
 extern crate regex;
 extern crate rustls;

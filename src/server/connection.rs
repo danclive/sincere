@@ -7,13 +7,13 @@ use std::rc::Rc;
 use rustls;
 use rustls::Session;
 
-use queen::Token;
-use queen::tcp::TcpStream;
-use queen::channel;
-use queen::Evented;
-use queen::Poll;
-use queen::Ready;
-use queen::PollOpt;
+use queen_io::Token;
+use queen_io::tcp::TcpStream;
+use queen_io::channel;
+use queen_io::Evented;
+use queen_io::Poll;
+use queen_io::Ready;
+use queen_io::PollOpt;
 
 use util::threadpool::Pool;
 

@@ -7,15 +7,15 @@ use std::rc::Rc;
 
 use rustls;
 
-use queen::Token;
-use queen::Poll;
-use queen::Ready;
-use queen::PollOpt;
-use queen::channel::{self, Receiver, Sender};
-use queen::Events;
-use queen::Event;
-use queen::tcp::TcpListener;
-use queen::Evented;
+use queen_io::Token;
+use queen_io::Poll;
+use queen_io::Ready;
+use queen_io::PollOpt;
+use queen_io::channel::{self, Receiver, Sender};
+use queen_io::Events;
+use queen_io::Event;
+use queen_io::tcp::TcpListener;
+use queen_io::Evented;
 
 use util::threadpool::Pool;
 

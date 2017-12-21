@@ -1,6 +1,6 @@
 [package]
 name          = "sincere"
-version       = "0.4.0"
+version       = "0.4.1"
 license       = "MIT"
 authors       = ["mitum <dangcheng@hotmail.com>"]
 description   = "web framework"
@@ -17,7 +17,7 @@ exclude       = [
 ]
 
 [dependencies]
-queen = "0.1"
+queen-io = "0.1"
 chrono = "0.4"
 regex = "0.2"
 rustls = "0.11"
