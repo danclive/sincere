@@ -63,7 +63,11 @@ impl App {
     route!(option);
     route!(head);
 
-    pub fn mount(&mut self, group: Group) {
+    pub fn mount<F>(&mut self, func: F)
+        where F: Fn() -> Group
+    {
+        let group = func();
+
         self.groups.push(group)
     }
 
