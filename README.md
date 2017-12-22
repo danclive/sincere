@@ -19,7 +19,7 @@ fn main() {
 ```
 Don't forget add this to your `Cargo.toml`:
 
-```
+```toml
 [dependencies]
 sincere = "0.4"
 ```
