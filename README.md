@@ -1,5 +1,9 @@
 # Sincere
 
+[![crates.io](https://meritbadge.herokuapp.com/sincere)](https://crates.io/crates/sincere)
+[![Build Status](https://travis-ci.org/mitum/sincere.svg?branch=master)](https://travis-ci.org/mitum/sincere)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 Sincere is a micro web framework for Rust(stable) based on epoll and multithreadind. Here is an example of a simple application:
 
 ```rust
