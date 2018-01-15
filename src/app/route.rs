@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ascii::AsciiExt;
 
 use http::Method;
 use super::Handle;

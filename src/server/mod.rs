@@ -55,7 +55,7 @@ impl Server {
             conns: HashMap::with_capacity(1024),
             token: 4,
             handle: Arc::new(Box::new(|_| {})),
-            poll: Poll::new().unwrap(),
+            poll: Poll::new()?,
             events: Events::with_capacity(1024),
             thread_pool: Rc::new(Pool::new()),
             tx: tx,
