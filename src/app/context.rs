@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
+use fastcgi;
+
 use http::Request;
 use http::Response;
 
@@ -12,7 +14,8 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(request: Request) -> Context {
+    pub fn new(raw_request: fastcgi::Request) -> Context {
+        let request = Request::from_fastcgi(raw_request);
         let response = Response::empty(200);
 
         Context {
@@ -29,6 +32,11 @@ impl Context {
 
     pub fn next(&self) -> bool {
         !self.stop
+    }
+
+    pub fn finish(&mut self) {
+        let raw = self.request.raw();
+        self.response.write_raw(raw);
     }
 }
 

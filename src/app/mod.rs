@@ -1,24 +1,21 @@
-use std::sync::{Arc, Mutex};
+use std::net::TcpListener;
 
 use regex::Regex;
 
-use server::Server;
-use server::Stream;
+use fastcgi;
+use error::Result;
 
-use http::Http;
-use http::Response;
 pub use self::route::Route;
 pub use self::group::Group;
-pub use self::context::{Context, Value};
 use self::middleware::Middleware;
-use error::Result;
+use self::context::Context;
 
 #[macro_use]
 mod macros;
 mod route;
-mod context;
 mod group;
-mod middleware;
+pub mod middleware;
+pub mod context;
 
 pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 
@@ -90,140 +87,108 @@ impl App {
         });
     }
 
-    pub fn handle(&self, stream: Arc<Mutex<Stream>>) {
+    pub fn handle(&self, raw_request: fastcgi::Request) {
+        let mut context = Context::new(raw_request);
 
-        let mut http = Http::new(stream);
+        let mut route_found = false;
 
-        match http.decode() {
-            Ok(Some(request)) => {
+        for begin in self.begin.iter() {         
+            begin.execute_always(&mut context);
+        }
 
-                let mut context = Context::new(request);
+        if context.next() {
 
-                let mut route_found = false;
+            'outer: for group in self.groups.iter() {
 
-                for begin in self.begin.iter() {         
-                    begin.execute_always(&mut context);
-                }
+                for route in group.routes.iter() {
 
-                if context.next() {
-
-                    'outer: for group in self.groups.iter() {
-
-                        for route in group.routes.iter() {
-
-                            if route.method() != context.request.method() {
-                                continue;
-                            }
-
-                            let path = {
-                                let path = context.request.path();
-                                let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
-                                if path != "/" {
-                                    path.trim_right_matches('/').to_owned()
-                                } else {
-                                    path.to_owned()
-                                }
-                            };
-
-                            let pattern = {
-                                let pattern = route.compilied_pattern();
-                                if pattern != "/" {
-                                    pattern.trim_right_matches('/').to_owned()
-                                } else {
-                                    pattern
-                                }
-                            };
-
-                            if pattern.contains("^") {
-                                let re = Regex::new(&pattern).unwrap();
-                                let caps = re.captures(&path);
-
-                                if let Some(caps) = caps {
-                                    route_found = true;
-
-                                    let matches = route.path();
-
-                                    for (key, value) in matches.iter() {
-                                        context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
-                                    }
-                                }
-                            } else {
-                                if pattern == path {
-                                    route_found = true;
-                                }
-                            }
-
-                            if route_found {
-                                
-                                for before in self.before.iter() {
-                                    before.execute(&mut context);
-                                }
-
-                                for before in group.before.iter() {
-                                    before.execute(&mut context);
-                                }
-
-                                route.execute(&mut context);
-
-                                for after in group.after.iter() {
-                                    after.execute(&mut context);
-                                }
-
-                                for after in self.after.iter() {
-                                    after.execute(&mut context);
-                                }
-
-                                break 'outer;
-                            }
-                        }
+                    if route.method() != context.request.method() {
+                        continue;
                     }
 
-                    if !route_found {
-                        if let Some(ref not_found) = self.not_found {
-                            not_found.execute(&mut context);
+                    let path = {
+                        let path = context.request.uri();
+                        let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
+                        if path != "/" {
+                            path.trim_right_matches('/').to_owned()
                         } else {
-                            context.response.status(404).from_text("Not Found").unwrap();
+                            path.to_owned()
+                        }
+                    };
+
+                    let pattern = {
+                        let pattern = route.compilied_pattern();
+                        if pattern != "/" {
+                            pattern.trim_right_matches('/').to_owned()
+                        } else {
+                            pattern
+                        }
+                    };
+
+                    if pattern.contains("^") {
+                        let re = Regex::new(&pattern).unwrap();
+                        let caps = re.captures(&path);
+
+                        if let Some(caps) = caps {
+                            route_found = true;
+
+                            let matches = route.path();
+
+                            for (key, value) in matches.iter() {
+                                context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                            }
+                        }
+                    } else {
+                        if pattern == path {
+                            route_found = true;
                         }
                     }
 
+                    if route_found {
+                                
+                        for before in self.before.iter() {
+                            before.execute(&mut context);
+                        }
+
+                        for before in group.before.iter() {
+                            before.execute(&mut context);
+                        }
+
+                        route.execute(&mut context);
+
+                        for after in group.after.iter() {
+                            after.execute(&mut context);
+                        }
+
+                        for after in self.after.iter() {
+                            after.execute(&mut context);
+                        }
+
+                        break 'outer;
+                    }
                 }
+            }
 
-                for finish in self.finish.iter() {
-                    finish.execute_always(&mut context);
+            if !route_found {
+                if let Some(ref not_found) = self.not_found {
+                    not_found.execute(&mut context);
+                } else {
+                    context.response.status_code(404).from_text("Not Found").unwrap();
                 }
-
-                http.encode(context.response);
-
-            }
-            Ok(None) => {
-                let response = Response::empty(100);
-                http.encode(response);
-            }
-            Err(err) => {
-                let response = Response::empty(501);
-                http.encode(response);
-                println!("http paser{:?}", err);
             }
         }
+
+        for finish in self.finish.iter() {
+            finish.execute_always(&mut context);
+        }
+
+        context.finish();
     }
 
-    pub fn run(self, addr: &str) -> Result<()> {
+    pub fn run(self, addr: &str, thread_size: usize) -> Result<()> {
+        let tcp = TcpListener::bind(addr)?;
 
-        let mut server = Server::new(addr).unwrap();
-
-        server.run(Box::new(move |stream| {
-            self.handle(stream);
-        }))?;
-
-        Ok(())
-    }
-
-    pub fn run_tls(self, addr: &str, cert: &str, private_key: &str) -> Result<()> {
-        let mut server = Server::new(addr).unwrap();
-
-        server.run_tls(Box::new(move |stream| {
-            self.handle(stream);
-        }), cert, private_key)?;
+        fastcgi::run_tcp(move |raw_request| { self.handle(raw_request) }, &tcp, thread_size)?;
 
         Ok(())
     }

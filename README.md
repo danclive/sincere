@@ -18,7 +18,7 @@ fn main() {
         context.response.from_text("Hello world!").unwrap();
     });
 
-    app.run("127.0.0.1:8000");
+    app.run("127.0.0.1:9001", 20).unwrap();
 }
 ```
 Don't forget add this to your `Cargo.toml`:
@@ -189,7 +189,7 @@ pub fn auth(context: &mut Context) {
             }
         }
     } else {
-        context.response.status(401);
+        context.response.status_code(401);
         context.stop();
     }
 }
@@ -206,7 +206,7 @@ pub fn cors(app: &mut App) {
     app.begin(move |context| {
         if context.request.method() == &Method::Options {
             context.response
-            .status(204)
+            .status_code(204)
             .header(("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"));
 
             context.stop();
@@ -288,12 +288,12 @@ app.post("/article", |content| {
 });
 ```
 
-### Get and set headers, http status
+### Get and set headers, http status code
 
 ```rust
 app.get("/", |context| {
     let token = context.request.get_header("Token").unwrap_or("none".to_owned());
 
-    context.response.from_text("Hello world!").status(200).header(("Hello", "World")).unwrap();
+    context.response.from_text("Hello world!").status_code(200).header(("Hello", "World")).unwrap();
 });
 ```

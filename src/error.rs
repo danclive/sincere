@@ -6,9 +6,6 @@ use std::sync::mpsc::TryRecvError;
 use std::string::FromUtf8Error;
 use std::num::ParseIntError;
 
-use queen_io::channel::SendError;
-use queen_io::tcp::TcpStream;
-
 use serde_json;
 
 use httparse;
@@ -19,7 +16,6 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     IoError(io::Error),
     JsonError(serde_json::Error),
-    SendSocketError(SendError<TcpStream>),
     ReceiveSocketError(TryRecvError),
     FromUtf8Error(FromUtf8Error),
     HttpParseError(httparse::Error),
@@ -39,17 +35,7 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<SendError<TcpStream>> for Error {
-    fn from(err: SendError<TcpStream>) -> Self {
-        Error::SendSocketError(err)
-    }
-}
 
-impl From<TryRecvError> for Error {
-    fn from(err: TryRecvError) -> Self {
-        Error::ReceiveSocketError(err)
-    }
-}
 
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
@@ -74,7 +60,6 @@ impl fmt::Display for Error {
         match *self {
             Error::IoError(ref inner) => inner.fmt(fmt),
             Error::JsonError(ref inner) => inner.fmt(fmt),
-            Error::SendSocketError(ref inner) => inner.fmt(fmt),
             Error::ReceiveSocketError(ref inner) => inner.fmt(fmt),
             Error::FromUtf8Error(ref inner) => inner.fmt(fmt),
             Error::HttpParseError(ref inner) => inner.fmt(fmt),
@@ -89,7 +74,6 @@ impl error::Error for Error {
         match *self {
             Error::IoError(ref err) => err.description(),
             Error::JsonError(ref err) => err.description(),
-            Error::SendSocketError(ref err) => err.description(),
             Error::ReceiveSocketError(ref err) => err.description(),
             Error::FromUtf8Error(ref err) => err.description(),
             Error::HttpParseError(ref err) => err.description(),
@@ -102,7 +86,6 @@ impl error::Error for Error {
         match *self {
             Error::IoError(ref err) => Some(err),
             Error::JsonError(ref err) => Some(err),
-            Error::SendSocketError(ref err) => Some(err),
             Error::ReceiveSocketError(ref err) => Some(err),
             Error::FromUtf8Error(ref err) => Some(err),
             Error::HttpParseError(ref err) => Some(err),
@@ -111,3 +94,4 @@ impl error::Error for Error {
         }
     }
 }
+

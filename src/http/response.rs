@@ -1,27 +1,28 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 
 use serde::Serialize;
 use serde_json;
 
-use super::http_code::StatusCode;
+use fastcgi;
+
+use super::status_code::StatusCode;
 use error::Result;
 
 #[derive(Debug)]
 pub struct Response {
-    pub status_code: StatusCode,
-    pub headers: HashMap<String, String>,
-    pub data_length: Option<usize>,
-    pub data: Vec<u8>,
+    status_code: StatusCode,
+    headers: HashMap<String, String>,
+    data: Vec<u8>,
 }
 
 impl Response {
-    pub fn new(status_code: StatusCode, headers: HashMap<String, String>, data_length: Option<usize>, data: Vec<u8>) -> Response {
+    pub fn new(status_code: StatusCode, headers: HashMap<String, String>, data: Vec<u8>) -> Response {
         Response {
             status_code: status_code,
             headers: headers,
-            data_length: data_length,
             data: data,
         }
     }
@@ -32,7 +33,6 @@ impl Response {
         Response::new(
             status_code.into(),
             HashMap::new(),
-            Some(0),
             Vec::new(),
         )
     }
@@ -41,27 +41,23 @@ impl Response {
         where C: Into<String>, D: Into<Vec<u8>>
     {
         let data = data.into();
-        let data_len = data.len();
 
         self.headers.insert("Content-Type".to_owned(), content_type.into());
-
-        self.data_length = Some(data_len);
         self.data = data;
+
         Ok(self)
     }
 
     pub fn from_file<C>(&mut self, content_type: C, mut file: File) -> Result<&mut Response>
         where C: Into<String>
     {
-        let file_size = file.metadata().ok().map(|v| v.len() as usize);
-
+        //let file_size = file.metadata().ok().map(|v| v.len() as usize);
         let mut data: Vec<u8> = Vec::new();
         file.read_to_end(&mut data)?;
 
         self.headers.insert("Content-Type".to_owned(), content_type.into());
-
-        self.data_length = file_size;
         self.data = data;
+
         Ok(self)
     }
 
@@ -69,12 +65,10 @@ impl Response {
         where S: Into<String>
     {
         let string = string.into();
-        let data_len = string.len();
 
         self.headers.insert("Content-Type".to_owned(), "text/plain; charset=UTF-8".to_owned());
-
-        self.data_length = Some(data_len);
         self.data = string.into();
+
         Ok(self)
     }
 
@@ -82,30 +76,29 @@ impl Response {
         where S: Into<String>
     {
         let string = string.into();
-        let data_len = string.len();
 
         self.headers.insert("Content-Type".to_owned(), "text/html; charset=UTF-8".to_owned());
-
-        self.data_length = Some(data_len);
         self.data = string.into();
+
         Ok(self)
     }
 
     pub fn from_json<S: Serialize>(&mut self, value: S) -> Result<&mut Response> {
         let data = serde_json::to_vec(&value)?;
-        let data_len = data.len();
 
         self.headers.insert("Content-Type".to_owned(), "application/json; charset=UTF-8".to_owned());
-
-        self.data_length = Some(data_len);
         self.data = data;
 
         Ok(self)
     }
 
-    pub fn status(&mut self, code: u16) -> &mut Response {
+    pub fn status_code(&mut self, code: u16) -> &mut Response {
         self.status_code = code.into();
         self
+    }
+
+    pub fn get_status_code(&self) -> u16 {
+        self.status_code.0
     }
 
     pub fn header<S>(&mut self, header: (S, S)) -> &mut Response
@@ -113,5 +106,46 @@ impl Response {
     {
         self.headers.insert(header.0.into(), header.1.into());
         self
+    }
+
+    pub fn get_header(&self, name: &str) -> Option<&String> {
+        self.headers.get(name)
+    }
+
+    pub fn get_headers(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
+    pub fn write_raw(&mut self, raw_request: &mut fastcgi::Request) {
+        let mut stdout = raw_request.stdout();
+
+        println!("{:?}", "111");
+
+        write!(stdout, "Status: {} {}\r\n", self.status_code.0, self.status_code.default_reason_phrase()).unwrap();
+
+        println!("{:?}", "222");
+
+        let data_len = self.data.len();
+        if data_len > 0 {
+             write!(stdout, "Content-Length: {}\r\n", data_len).unwrap();
+        }
+
+        println!("{:?}", "333");
+
+        for (key, value) in self.headers.iter() {
+            write!(stdout, "{}: {}\r\n", key, value).unwrap();
+        }
+
+        println!("{:?}", "444");
+
+        write!(stdout, "\r\n").unwrap();
+
+        println!("{:?}", "555");
+
+        if data_len > 0 {
+            stdout.write(&self.data).unwrap();
+        }
+
+        println!("{:?}", "666");
     }
 }
