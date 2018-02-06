@@ -1,8 +1,13 @@
-use std::net::TcpListener;
+use std::sync::Arc;
+use std::rc::Rc;
 
 use regex::Regex;
 
-use fastcgi;
+use futures::future::Future;
+use futures_cpupool::CpuPool;
+
+use hyper::server::{Http, Request, Response, Service};
+use hyper;
 use error::Result;
 
 pub use self::route::Route;
@@ -25,7 +30,7 @@ pub struct App {
     before: Vec<Middleware>,
     after: Vec<Middleware>,
     finish: Vec<Middleware>,
-    not_found: Option<Middleware>,
+    not_found: Option<Middleware>
 }
 
 impl App {
@@ -36,7 +41,7 @@ impl App {
             before: Vec::new(),
             after: Vec::new(),
             finish: Vec::new(),
-            not_found: None,
+            not_found: None
         }
     }
 
@@ -44,7 +49,7 @@ impl App {
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         let route = Route::new(
-            method.parse().unwrap(), 
+            method.parse().unwrap(),
             pattern.into(), 
             Box::new(handle),
         );
@@ -54,11 +59,15 @@ impl App {
     }
 
     route!(get);
-    route!(post);
     route!(put);
-    route!(delete);
-    route!(option);
+
+    route!(post);
     route!(head);
+
+    route!(delete);
+
+    route!(options);
+    route!(connect);
 
     pub fn mount<F>(&mut self, func: F)
         where F: Fn() -> Group
@@ -87,8 +96,9 @@ impl App {
         });
     }
 
-    pub fn handle(&self, raw_request: fastcgi::Request) {
-        let mut context = Context::new(raw_request);
+    pub fn handle(&self, request: Request) -> Response {
+
+        let mut context = Context::new(request);
 
         let mut route_found = false;
 
@@ -107,8 +117,7 @@ impl App {
                     }
 
                     let path = {
-                        let path = context.request.uri();
-                        let path = path.find('?').map_or(path.as_ref(), |pos| &path[..pos]);
+                        let path = context.request.uri().path();
                         if path != "/" {
                             path.trim_right_matches('/').to_owned()
                         } else {
@@ -182,14 +191,47 @@ impl App {
             finish.execute_always(&mut context);
         }
 
-        context.finish();
+        context.finish()
     }
 
     pub fn run(self, addr: &str, thread_size: usize) -> Result<()> {
-        let tcp = TcpListener::bind(addr)?;
 
-        fastcgi::run_tcp(move |raw_request| { self.handle(raw_request) }, &tcp, thread_size)?;
+        let app_service = AppService {
+            inner: Arc::new(self),
+            thread_pool: CpuPool::new(thread_size)
+        };
+
+        let app = Rc::new(app_service);
+
+        let addr = addr.parse().expect("Address is not valid");
+        let server = Http::new().bind(&addr, move || Ok(app.clone()))?;
+        server.run()?;
 
         Ok(())
+    }
+}
+
+struct AppService {
+    inner: Arc<App>,
+    thread_pool: CpuPool
+}
+
+impl Service for AppService {
+    type Request = Request;
+    type Response = Response;
+    type Error = hyper::Error;
+    type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
+
+    fn call(&self, request: Request) -> Self::Future {
+
+        let app = self.inner.clone();
+
+        let msg = self.thread_pool.spawn_fn(move || {
+            let response = app.handle(request);
+
+            Ok(response)
+        });
+
+        Box::new(msg)
     }
 }

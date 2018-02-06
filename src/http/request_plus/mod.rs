@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::fs;
 use std::io::{self, Read, Write};
 
-use mime;
+use hyper::mime;
 
 use super::request::Request;
 
@@ -17,20 +17,21 @@ pub mod save;
 
 impl Request {
     pub fn parse_formdata(&mut self) -> Option<FormData> {
-        if let Some(content_type) = self.content_type() {
-            if let Ok(mime) = content_type.parse::<mime::Mime>() {
-                if mime.type_() == mime::MULTIPART && mime.subtype() == mime::FORM_DATA {
-                    let boundary = if let Some(boundary) = mime.get_param(mime::BOUNDARY) {
-                        boundary.as_str()
-                    } else {
-                        return None
-                    };
+        let content_type = match self.content_type() {
+            Some(c) => c.to_owned(),
+            None => return None
+        };
 
-                    let reader = io::Cursor::new(self.body());
+        if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
+            let boundary = if let Some(boundary) = content_type.get_param(mime::BOUNDARY) {
+                boundary.as_str()
+            } else {
+                return None
+            };
 
-                    return Some(FormData::with_body(reader, boundary));
-                }
-            }
+            let reader = io::Cursor::new(self.body());
+
+            return Some(FormData::with_body(reader, boundary));
         }
 
         None

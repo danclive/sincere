@@ -1,46 +1,41 @@
-use std::str::FromStr;
 use std::collections::HashMap;
-use std::io::Read;
 
 use serde::de::DeserializeOwned;
 use serde_json;
 
-use mime;
+use futures::{Future, Stream};
 
-use fastcgi;
-use text;
+use hyper::{self, Uri, Method, Headers};
+use hyper::header::ContentType;
+
 use util::url;
 
 use error::Result;
 
-use super::method::Method;
-
 pub struct Request {
-    raw: fastcgi::Request,
-    uri: String,
+    uri: Uri,
     method: Method,
+    headers: Headers,
     params: HashMap<String, String>,
-    querys: HashMap<String, String>,
-    posts: HashMap<String, String>,
+    querys: Vec<(String, String)>,
+    posts: Vec<(String, String)>,
     body: Vec<u8>
 }
 
 impl Request {
-    pub fn from_fastcgi(raw_request: fastcgi::Request) -> Request {
-        let request_uri = raw_request.param("REQUEST_URI").unwrap_or(String::default());
+    pub fn from_hyper_request(hyper_request: hyper::Request) -> Request { 
+        let (method, uri, _http_version, headers, body) = hyper_request.deconstruct();
 
-        let method = raw_request.param("REQUEST_METHOD").or(raw_request.param("X-HTTP-METHOD-OVERRIDE")).unwrap_or_default();
-
-        let method = Method::from_str(&method).unwrap();
+        let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();
 
         let mut request = Request {
-            raw: raw_request,
-            uri: request_uri,
+            uri: uri,
             method: method,
+            headers: headers,
             params: HashMap::new(),
-            querys: HashMap::new(),
-            posts: HashMap::new(),
-            body: Vec::new()
+            querys: Vec::new(),
+            posts: Vec::new(),
+            body: body
         };
 
         request.parse_query();
@@ -50,7 +45,7 @@ impl Request {
     }
 
     #[inline]
-    pub fn uri(&self) -> &str {
+    pub fn uri(&self) -> &Uri {
         &self.uri
     }
 
@@ -70,103 +65,78 @@ impl Request {
     }
 
     #[inline]
-    pub fn query(&self, key: &str) -> Option<String> {
-        self.querys.get(key).map(|q| q.to_owned() )
+    pub fn query(&self, key: &str) -> Option<&str> {
+        self.querys.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| &**v)
     }
 
     #[inline]
-    pub fn querys(&mut self) -> &HashMap<String, String> {
-        &mut self.querys
+    pub fn querys(&self) -> &Vec<(String, String)> {
+        &self.querys
     }
 
     #[inline]
-    pub fn header(&self, key: &str) -> Option<String> {
-        let key = key.to_uppercase().replace("-", "_");
-
-        self.raw.param(&key).or(self.raw.param(&("HTTP_".to_owned() + &key)))
+    pub fn post(&self, key: &str) -> Option<&str> {
+        self.posts.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| &**v)
     }
 
-    pub fn headers(&self) -> HashMap<String, String> {
-        let mut headers = HashMap::new();
+    #[inline]
+    pub fn posts(&self) -> &Vec<(String, String)> {
+        &self.posts
+    }
 
-        for (key, value) in self.raw.params() {
-            if key.starts_with("HTTP_") {
-                let (_, key) = key.split_at(5);
-                let key = text::unwords(key, "_");
-                headers.insert(key, value.to_owned());
-            } else {
-                let key = text::unwords(key, "_");
-                headers.insert(key, value.to_owned());
+    pub fn header(&self, name: &str) -> Option<String> {
+        match self.headers.get_raw(name) {
+            Some(value) => {
+                match value.one() {
+                    Some(value) => {
+                        let value = String::from_utf8_lossy(value);
+
+                        return Some(value.to_string())
+                    },
+                    None => return None
+                }
             }
-        }
-
-        headers
+            None => return None
+        };
     }
 
     #[inline]
-    pub fn content_type(&self) -> Option<String> {
-        self.header("CONTENT_TYPE")
+    pub fn headers(&self) -> &Headers {
+        &self.headers
     }
 
     #[inline]
-    pub fn content_length(&self) -> usize {
-        match self.header("CONTENT_LENGTH") {
-            Some(content_length) => {
-                content_length.parse().unwrap_or(0)
-            }
-            None => 0
-        }
+    pub fn content_type(&self) -> Option<&ContentType> {
+        self.headers.get::<ContentType>()
     }
 
     #[inline]
     fn parse_query(&mut self) {
-        let uri: String = self.uri.find('?').map_or("".to_owned(), |pos| self.uri[pos + 1..].to_owned());
+        let url = match self.uri().query() {
+            Some(url) => url.to_owned(),
+            None => return
+        };
 
-        if uri.len() > 0 {
-            self.querys = url::from_str::<HashMap<String, String>>(&uri).unwrap_or_default();
-        }
+        self.querys = url::from_str::<Vec<(String, String)>>(&url).unwrap_or_default();
     }
 
+    #[inline]
     fn parse_post(&mut self) {
 
-        match self.content_type() {
-            Some(content_type) => {
-                match content_type.parse::<mime::Mime>() {
-                    Ok(mime) => {
-                        if mime.type_() == mime::APPLICATION && mime.subtype() == mime::WWW_FORM_URLENCODED {
-                            self.body();
+        let content_type = match self.content_type() {
+            Some(c) => c.to_owned(),
+            None => return
+        };
 
-                            let params = String::from_utf8_lossy(&self.body);
-                            self.posts = url::from_str::<HashMap<String, String>>(&params).unwrap_or_default();
-
-                            return
-                        }
-                    },
-                    Err(_) => ()
-                }
-            }
-            None => ()
+        if content_type == ContentType::form_url_encoded() {
+            let params = String::from_utf8_lossy(&self.body);
+            self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
         }
     }
 
     #[inline]
-    pub fn body(&mut self) -> &mut Vec<u8> {
-        if self.body.len() == 0 {
-            let length = self.content_length();
-
-            if length > 0 {
-                let mut buf: Vec<u8> = Vec::with_capacity(length);
-                let _ = self.raw.stdin().read_to_end(&mut buf);
-                self.body = buf;
-            }
-        }
-
-        &mut self.body
-    }
-
-    #[inline]
-    pub fn raw(&mut self) -> &mut fastcgi::Request {
-        &mut self.raw
+    pub fn body(&self) -> &Vec<u8> {
+        &self.body
     }
 
     #[inline]

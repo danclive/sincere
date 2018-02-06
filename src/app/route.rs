@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use http::Method;
+use hyper::Method;
+
 use super::Handle;
 use super::context::Context;
 use super::middleware::Middleware;

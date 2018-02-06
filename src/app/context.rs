@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use fastcgi;
+use hyper;
 
 use http::Request;
 use http::Response;
@@ -14,8 +14,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(raw_request: fastcgi::Request) -> Context {
-        let request = Request::from_fastcgi(raw_request);
+
+    pub fn new(hyper_request: hyper::Request) -> Context {
+        let request = Request::from_hyper_request(hyper_request);
         let response = Response::empty(200);
 
         Context {
@@ -34,9 +35,8 @@ impl Context {
         !self.stop
     }
 
-    pub fn finish(&mut self) {
-        let raw = self.request.raw();
-        self.response.write_raw(raw);
+    pub fn finish(self) -> hyper::Response {
+        self.response.raw_response()
     }
 }
 

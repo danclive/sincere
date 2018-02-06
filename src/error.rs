@@ -10,6 +10,8 @@ use serde_json;
 
 use httparse;
 
+use hyper;
+
 pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -20,6 +22,7 @@ pub enum Error {
     FromUtf8Error(FromUtf8Error),
     HttpParseError(httparse::Error),
     ParseIntError(ParseIntError),
+    HyperError(hyper::Error),
     Error(String),
 }
 
@@ -34,8 +37,6 @@ impl From<serde_json::Error> for Error {
         Error::JsonError(err)
     }
 }
-
-
 
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
@@ -55,6 +56,12 @@ impl From<httparse::Error> for Error {
     }
 }
 
+impl From<hyper::Error> for Error {
+    fn from(err: hyper::Error) -> Self {
+        Error::HyperError(err)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -64,6 +71,7 @@ impl fmt::Display for Error {
             Error::FromUtf8Error(ref inner) => inner.fmt(fmt),
             Error::HttpParseError(ref inner) => inner.fmt(fmt),
             Error::ParseIntError(ref inner) => inner.fmt(fmt),
+            Error::HyperError(ref inner) => inner.fmt(fmt),
             Error::Error(ref inner) => inner.fmt(fmt),
         }
     }
@@ -78,6 +86,7 @@ impl error::Error for Error {
             Error::FromUtf8Error(ref err) => err.description(),
             Error::HttpParseError(ref err) => err.description(),
             Error::ParseIntError(ref err) => err.description(),
+            Error::HyperError(ref err) => err.description(),
             Error::Error(ref err) => err,
         }
     }
@@ -90,6 +99,7 @@ impl error::Error for Error {
             Error::FromUtf8Error(ref err) => Some(err),
             Error::HttpParseError(ref err) => Some(err),
             Error::ParseIntError(ref err) => Some(err),
+            Error::HyperError(ref err) => Some(err),
             Error::Error(_) => None,
         }
     }

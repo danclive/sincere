@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::io::Write;
 
 use serde::Serialize;
 use serde_json;
 
-use fastcgi;
+use hyper;
+use hyper::header::ContentLength;
 
 use super::status_code::StatusCode;
 use error::Result;
@@ -92,15 +92,18 @@ impl Response {
         Ok(self)
     }
 
+    #[inline]
     pub fn status_code(&mut self, code: u16) -> &mut Response {
         self.status_code = code.into();
         self
     }
 
+    #[inline]
     pub fn get_status_code(&self) -> u16 {
         self.status_code.0
     }
 
+    #[inline]
     pub fn header<S>(&mut self, header: (S, S)) -> &mut Response
         where S: Into<String>
     {
@@ -108,44 +111,37 @@ impl Response {
         self
     }
 
+    #[inline]
     pub fn get_header(&self, name: &str) -> Option<&String> {
         self.headers.get(name)
     }
 
+    #[inline]
     pub fn get_headers(&self) -> &HashMap<String, String> {
         &self.headers
     }
 
-    pub fn write_raw(&mut self, raw_request: &mut fastcgi::Request) {
-        let mut stdout = raw_request.stdout();
+    #[inline]
+    pub fn raw_response(self) -> hyper::Response {
 
-        println!("{:?}", "111");
+        let mut response = hyper::Response::new();
 
-        write!(stdout, "Status: {} {}\r\n", self.status_code.0, self.status_code.default_reason_phrase()).unwrap();
+        response.set_status(hyper::StatusCode::try_from(self.get_status_code()).unwrap());
 
-        println!("{:?}", "222");
+        let mut headers = hyper::Headers::with_capacity(12);
 
         let data_len = self.data.len();
-        if data_len > 0 {
-             write!(stdout, "Content-Length: {}\r\n", data_len).unwrap();
-        }
 
-        println!("{:?}", "333");
+        if data_len > 0 {
+            headers.set(ContentLength(data_len as u64));
+
+            response.set_body(self.data);
+        }
 
         for (key, value) in self.headers.iter() {
-            write!(stdout, "{}: {}\r\n", key, value).unwrap();
+            headers.set_raw(key.to_string(), value.to_string());
         }
 
-        println!("{:?}", "444");
-
-        write!(stdout, "\r\n").unwrap();
-
-        println!("{:?}", "555");
-
-        if data_len > 0 {
-            stdout.write(&self.data).unwrap();
-        }
-
-        println!("{:?}", "666");
+        response
     }
 }

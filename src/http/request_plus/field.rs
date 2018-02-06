@@ -2,7 +2,7 @@ use std::io::{self, Read, BufRead};
 use std::{str, fmt, error};
 
 use httparse::{self, EMPTY_HEADER, Header, Status};
-use mime::{self, Mime};
+use hyper::mime::{self, Mime};
 
 use super::save::SaveBuilder;
 use super::multipart::ArcStr;
