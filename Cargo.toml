@@ -17,7 +17,6 @@ exclude       = [
 ]
 
 [dependencies]
-queen-io = "0.1"
 chrono = "0.4"
 regex = "0.2"
 serde = "1.0"
