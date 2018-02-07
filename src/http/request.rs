@@ -56,7 +56,7 @@ impl Request {
 
     #[inline]
     pub fn param(&self, key: &str) -> Option<String> {
-        self.params.get(key).map(|m| m.to_owned() )
+        self.params.get(key).map(|m| m.to_string() )
     }
 
     #[inline]
@@ -65,8 +65,8 @@ impl Request {
     }
 
     #[inline]
-    pub fn query(&self, key: &str) -> Option<&str> {
-        self.querys.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| &**v)
+    pub fn query(&self, key: &str) -> Option<String> {
+        self.querys.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| v.to_string())
     }
 
     #[inline]

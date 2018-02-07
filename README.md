@@ -227,15 +227,15 @@ app.use_middleware(cors);
 
 ```rust
 app.get("/user/{id}", |context| {
-    let id = context.request.get_param("id").unwrap();
+    let id = context.request.param("id").unwrap();
 });
 
 app.get("/user/{id:[0-9]+}", |context| {
-    let id = context.request.get_param("id").unwrap();
+    let id = context.request.param("id").unwrap();
 });
 
 app.get("/user/{id:[a-z0-9]{24}}", |context| {
-    let id = context.request.get_param("id").unwrap();
+    let id = context.request.param("id").unwrap();
 });
 ```
 
@@ -245,8 +245,8 @@ app.get("/user/{id:[a-z0-9]{24}}", |context| {
 
 ```rust
 app.get("/article", |content| {
-    let page = context.request.get_query("page").unwrap_or("1".to_owned());
-    let per_page = context.request.get_query("per_page").unwrap_or("10".to_owned());
+    let page = context.request.query("page").unwrap_or("1");
+    let per_page = context.request.query("per_page").unwrap_or("10");
 });
 ```
 
@@ -292,7 +292,7 @@ app.post("/article", |content| {
 
 ```rust
 app.get("/", |context| {
-    let token = context.request.get_header("Token").unwrap_or("none".to_owned());
+    let token = context.request.header("Token").unwrap_or("none".to_owned());
 
     context.response.from_text("Hello world!").status_code(200).header(("Hello", "World")).unwrap();
 });
