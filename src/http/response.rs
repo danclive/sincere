@@ -128,7 +128,7 @@ impl Response {
 
         response.set_status(hyper::StatusCode::try_from(self.get_status_code()).unwrap());
 
-        let mut headers = hyper::Headers::with_capacity(12);
+        let mut headers = hyper::Headers::with_capacity(16);
 
         let data_len = self.data.len();
 
@@ -141,6 +141,8 @@ impl Response {
         for (key, value) in self.headers.iter() {
             headers.set_raw(key.to_string(), value.to_string());
         }
+
+        response = response.with_headers(headers);
 
         response
     }
