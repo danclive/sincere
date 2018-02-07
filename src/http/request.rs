@@ -75,8 +75,8 @@ impl Request {
     }
 
     #[inline]
-    pub fn post(&self, key: &str) -> Option<&str> {
-        self.posts.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| &**v)
+    pub fn post(&self, key: &str) -> Option<String> {
+        self.posts.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| v.to_string())
     }
 
     #[inline]

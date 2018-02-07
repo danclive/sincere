@@ -33,11 +33,15 @@ impl Group {
     }
 
     route!(get);
-    route!(post);
     route!(put);
-    route!(delete);
-    route!(option);
+
+    route!(post);
     route!(head);
+
+    route!(delete);
+
+    route!(options);
+    route!(connect);
 
     middleware!(before);
     middleware!(after);

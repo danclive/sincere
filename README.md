@@ -46,7 +46,9 @@ app.put("/user/{id:[0-9]+}", ...);
 
 app.delete("/user/{id:[0-9]+}", ...);
 
-app.option("/", ...);
+app.options("/", ...);
+
+app.connect("/", ...);
 
 app.head("/", ...);
 
