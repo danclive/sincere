@@ -8,8 +8,10 @@ use futures_cpupool::CpuPool;
 
 use hyper::server::{Http, Request, Response, Service};
 use hyper;
-use error::Result;
 
+use queen_log::color::Print;
+
+use error::Result;
 pub use self::route::Route;
 pub use self::group::Group;
 use self::middleware::Middleware;
@@ -98,7 +100,7 @@ impl App {
 
     pub fn handle(&self, request: Request) -> Response {
 
-        let mut context = Context::new(request);
+        let mut context = Context::new(self, request);
 
         let mut route_found = false;
 
@@ -202,6 +204,24 @@ impl App {
         };
 
         let app = Rc::new(app_service);
+
+        let sincere_logo = Print::green(
+    r"
+     __.._..  . __ .___.__ .___
+    (__  | |\ |/  `[__ [__)[__
+    .__)_|_| \|\__.[___|  \[___
+    "
+        );
+
+        println!("{}", sincere_logo);
+        println!(
+            "    {}{} {} {} {}",
+            Print::green("Server running at http://"),
+            Print::green(addr),
+            Print::green("on"),
+            Print::green(thread_size),
+            Print::green("threads.")
+        );
 
         let addr = addr.parse().expect("Address is not valid");
         let server = Http::new().bind(&addr, move || Ok(app.clone()))?;

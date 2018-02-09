@@ -34,7 +34,7 @@ Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello worl
 ### Routing
 
 ```rust
-app.add("GET", "user", ...);s
+app.add("GET", "/user", ...);
 
 app.get("/user", ...);
 

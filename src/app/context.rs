@@ -3,23 +3,26 @@ use std::time::Instant;
 
 use hyper;
 
+use super::App;
 use http::Request;
 use http::Response;
 
-pub struct Context {
+pub struct Context<'a> {
+    pub app: &'a App,
     pub request: Request,
     pub response: Response,
     pub contexts: HashMap<String, Value>,
     stop: bool
 }
 
-impl Context {
+impl<'a> Context<'a> {
 
-    pub fn new(hyper_request: hyper::Request) -> Context {
+    pub fn new(app: &App, hyper_request: hyper::Request) -> Context {
         let request = Request::from_hyper_request(hyper_request);
         let response = Response::empty(200);
 
         Context {
+            app: app,
             request: request,
             response: response,
             contexts: HashMap::new(),

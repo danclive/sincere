@@ -17,6 +17,10 @@ extern crate hyper;
 extern crate futures;
 extern crate futures_cpupool;
 
+#[allow(unused_imports)]
+#[macro_use]
+extern crate queen_log;
+
 pub use error::Error;
 
 pub mod http;
@@ -24,3 +28,12 @@ pub mod app;
 pub mod text;
 pub mod util;
 pub mod error;
+#[doc(hidden)]
+pub use queen_log::*;
+
+pub mod log {
+    pub use queen_log::color;
+    pub use queen_log::{LOG, MAX_LEVEL};
+    pub use queen_log::{Logger, DefaultLogger};
+    pub use queen_log::{Log, init, Level, Record, Metadata};
+}
