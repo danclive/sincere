@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/mitum/sincere.svg?branch=master)](https://travis-ci.org/mitum/sincere)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-Sincere is a micro web framework for Rust(stable) based on epoll and multithreadind. Here is an example of a simple application:
+Sincere is a micro web framework for Rust(stable) based on hyper and multithreadind. Here is an example of a simple application:
 
 ```rust
 extern crate sincere;
@@ -25,7 +25,7 @@ Don't forget add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sincere = "0.4"
+sincere = "0.5.4"
 ```
 Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello world` on the screen.
 
