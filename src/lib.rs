@@ -20,6 +20,7 @@ extern crate futures_cpupool;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate queen_log;
+extern crate mime_guess;
 
 pub use error::Error;
 

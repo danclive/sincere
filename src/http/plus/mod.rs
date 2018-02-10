@@ -2,10 +2,9 @@ use std::path::PathBuf;
 use std::fs;
 use std::io::{self, Read, Write};
 
-use hyper::mime;
+pub use hyper::mime;
 
 use super::request::Request;
-
 use error::Result;
 
 use self::multipart::Multipart;
@@ -14,6 +13,7 @@ pub mod multipart;
 pub mod boundary;
 pub mod field;
 pub mod save;
+pub mod client;
 
 impl Request {
     pub fn parse_formdata(&mut self) -> Option<FormData> {
@@ -57,7 +57,7 @@ impl FormData {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FilePart {
     pub name: String,
-    pub filename: String,
+    pub filename: Option<String>,
     pub content_type: mime::Mime,
     pub data: Vec<u8>,
 }
@@ -66,7 +66,13 @@ impl FilePart {
     pub fn save_file<P: Into<PathBuf>>(&mut self, path: P) -> Result<()> {
         let mut path = path.into();
 
-        path.push(&self.filename);
+        // Temp Path ??
+        if let Some(ref filename) = self.filename {
+            path.push(filename);
+        } else {
+            let filename = random_alphanumeric(16);
+            path.push(filename);
+        }
 
         let path = path.as_path();
 
@@ -114,7 +120,7 @@ impl FormData {
 
                 let file_part = FilePart {
                     name: entry.headers.name.to_string(),
-                    filename: entry.headers.filename.unwrap_or_default(),
+                    filename: entry.headers.filename,
                     content_type: entry.headers.content_type.unwrap(),
                     data: buf
                 };

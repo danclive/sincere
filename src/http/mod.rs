@@ -6,4 +6,4 @@ pub use hyper::{header, Headers, Method};
 mod request;
 mod response;
 mod status_code;
-pub mod request_plus;
+pub mod plus;
