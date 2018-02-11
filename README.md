@@ -18,14 +18,14 @@ fn main() {
         context.response.from_text("Hello world!").unwrap();
     });
 
-    app.run("127.0.0.1:9001", 20).unwrap();
+    app.run("127.0.0.1:8000", 20).unwrap();
 }
 ```
 Don't forget add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sincere = "0.5.4"
+sincere = "0.5.5"
 ```
 Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello world` on the screen.
 

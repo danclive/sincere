@@ -16,18 +16,56 @@ fn gen_boundary() -> String {
 
 use hyper::mime::{self, Mime};
 
+/// Create a structure to process the multipart/form-data data format for
+/// the client to initiate the request.
+///
+/// # Examples
+///
+/// ```
+/// use sincere::http::plus::client;
+///
+/// let mut multipart = client::Multipart::new();
+///
+/// multipart.add_text("hello", "world");
+///
+/// let (boundary, data) = multipart.convert().unwrap();
+/// ```
+///
+
 #[derive(Debug, Default)]
 pub struct Multipart<'a> {
     fields: Vec<Field<'a>>
 }
 
 impl <'a> Multipart<'a> {
+    /// Returns the empty `Multipart` set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::http::plus::client;
+    ///
+    /// let mut multipart = client::Multipart::new();
+    /// ```
+    #[inline]
     pub fn new() -> Multipart<'a> {
         Multipart {
             fields: Vec::new()
         }
     }
 
+    /// Add text 'key-value' into `Multipart`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::http::plus::client;
+    ///
+    /// let mut multipart = client::Multipart::new();
+    ///
+    /// multipart.add_text("hello", "world");
+    /// ```
+    #[inline]
     pub fn add_text<V>(&mut self, name: V, value: V) -> &mut Self
         where V: Into<String>
     {
@@ -41,6 +79,18 @@ impl <'a> Multipart<'a> {
         self
     }
 
+    /// Add file into `Multipart`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_test
+    /// use sincere::http::plus::client;
+    ///
+    /// let mut multipart = client::Multipart::new();
+    ///
+    /// multipart.add_file("hello.rs", "/aaa/bbb");
+    /// ```
+    #[inline]
     pub fn add_file<V, P>(&mut self, name: V, path: P) -> &mut Self
         where V: Into<String>, P: Into<PathBuf>
     {
@@ -54,6 +104,21 @@ impl <'a> Multipart<'a> {
         self
     }
 
+    /// Add reader stream into `Multipart`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::http::plus::client;
+    ///
+    /// let temp = r#"{"hello": "world"}"#.as_bytes();
+    /// let reader = ::std::io::Cursor::new(temp);
+    ///
+    /// let mut multipart = client::Multipart::new();
+    ///
+    /// multipart.add_stream("ddd", reader, Some("hello.rs"), Some(sincere::http::plus::mime::APPLICATION_JSON));
+    /// ```
+    #[inline]
     pub fn add_stream<V, R>(&mut self, name: V, stream: R, filename: Option<V>, mime: Option<Mime>) -> &mut Self
         where R: Read + 'a, V: Into<String>
     {
@@ -71,6 +136,19 @@ impl <'a> Multipart<'a> {
         self
     }
 
+    /// Convert `Multipart` to client boundary and body.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::http::plus::client;
+    ///
+    /// let mut multipart = client::Multipart::new();
+    ///
+    /// multipart.add_text("hello", "world");
+    ///
+    /// let (boundary, data) = multipart.convert().unwrap();
+    /// ```
     pub fn convert(&mut self) -> Result<(String, Vec<u8>)> {
         let mut boundary = format!("\r\n--{}", gen_boundary());
 

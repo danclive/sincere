@@ -7,11 +7,15 @@ use futures::{Future, Stream};
 
 use hyper::{self, Uri, Method, Headers};
 use hyper::header::ContentType;
+use hyper::mime;
 
 use util::url;
 
+use super::plus::FilePart;
+
 use error::Result;
 
+#[derive(Debug)]
 pub struct Request {
     uri: Uri,
     method: Method,
@@ -19,6 +23,7 @@ pub struct Request {
     params: HashMap<String, String>,
     querys: Vec<(String, String)>,
     posts: Vec<(String, String)>,
+    files: Vec<FilePart>,
     body: Vec<u8>
 }
 
@@ -35,6 +40,7 @@ impl Request {
             params: HashMap::new(),
             querys: Vec::new(),
             posts: Vec::new(),
+            files: Vec::new(),
             body: body
         };
 
@@ -129,8 +135,27 @@ impl Request {
         };
 
         if content_type == ContentType::form_url_encoded() {
+
             let params = String::from_utf8_lossy(&self.body);
             self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
+
+        } else if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
+
+            let form_data = self.parse_formdata();
+
+            if let Some(form_data) = form_data {
+                self.posts = form_data.fields;
+                self.files = form_data.files;
+            }
+        }
+    }
+
+    #[inline]
+    pub fn has_file(&self) -> bool {
+        if self.files.len() > 0 {
+            true
+        } else {
+            false
         }
     }
 

@@ -41,7 +41,7 @@ impl Request {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FormData {
     pub fields: Vec<(String, String)>,
-    pub files: Vec<(String, FilePart)>
+    pub files: Vec<FilePart>
 }
 
 impl FormData {
@@ -63,18 +63,20 @@ pub struct FilePart {
 }
 
 impl FilePart {
-    pub fn save_file<P: Into<PathBuf>>(&mut self, path: P) -> Result<()> {
-        let mut path = path.into();
+    pub fn save_file<P: Into<PathBuf>>(&mut self, path: P) -> Result<PathBuf> {
+        let mut path_buf = path.into();
 
         // Temp Path ??
         if let Some(ref filename) = self.filename {
-            path.push(filename);
+            path_buf.push(filename);
         } else {
             let filename = random_alphanumeric(16);
-            path.push(filename);
+            path_buf.push(filename);
         }
 
-        let path = path.as_path();
+        let path_buf2 = path_buf.clone();
+
+        let path = path_buf.as_path();
 
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -89,7 +91,7 @@ impl FilePart {
         file.write_all(&self.data)?;
         file.flush()?;
 
-        Ok(())
+        Ok(path_buf2)
     }
 }
 
@@ -125,7 +127,7 @@ impl FormData {
                     data: buf
                 };
 
-                form_data.files.push((entry.headers.name.to_string(), file_part))
+                form_data.files.push(file_part);
             }
         }
 
