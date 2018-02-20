@@ -136,6 +136,6 @@ impl FormData {
 }
 
 use rand::Rng;
-fn random_alphanumeric(len: usize) -> String {
+pub fn random_alphanumeric(len: usize) -> String {
     ::rand::thread_rng().gen_ascii_chars().take(len).collect()
 }

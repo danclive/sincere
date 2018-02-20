@@ -160,6 +160,11 @@ impl Request {
     }
 
     #[inline]
+    pub fn files(&self) -> &Vec<FilePart> {
+        &self.files
+    }
+
+    #[inline]
     pub fn body(&self) -> &Vec<u8> {
         &self.body
     }
