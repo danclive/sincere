@@ -11,7 +11,7 @@ use hyper::mime;
 
 use util::url;
 
-use super::plus::FilePart;
+use super::plus::server::FilePart;
 
 use error::Result;
 

@@ -4,7 +4,7 @@ macro_rules! route {
         pub fn $func_name<H>(&mut self, pattern: &str, handle: H) -> &mut Route
             where H: Fn(&mut Context) + Send + Sync + 'static
         {
-            self.add(&stringify!($func_name).to_uppercase(), pattern, handle)
+            self.add(stringify!($func_name).to_uppercase().parse().unwrap(), pattern, handle)
         }
     )
 }

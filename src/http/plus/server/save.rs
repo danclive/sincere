@@ -7,8 +7,9 @@ use std::{cmp, env, io, mem, str, u32, u64};
 pub use buf_redux::BufReader;
 pub use tempdir::TempDir;
 
+use http::plus::random_alphanumeric;
+
 use super::field::{FieldHeaders, MultipartField, MultipartData, ReadEntry};
-use super::random_alphanumeric;
 use super::multipart::ArcStr;
 
 const RANDOM_FILENAME_LEN: usize = 12;

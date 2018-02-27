@@ -6,8 +6,9 @@ use regex::Regex;
 use futures::future::Future;
 use futures_cpupool::CpuPool;
 
-use hyper::server::{Http, Request, Response, Service};
 use hyper;
+use hyper::server::{Http, Request, Response, Service};
+use hyper::Method;
 
 use queen_log::color::Print;
 
@@ -47,11 +48,11 @@ impl App {
         }
     }
 
-    fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
+    fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         let route = Route::new(
-            method.parse().unwrap(),
+            method,
             pattern.into(), 
             Box::new(handle),
         );
@@ -65,6 +66,9 @@ impl App {
 
     route!(post);
     route!(head);
+
+    route!(patch);
+    route!(trace);
 
     route!(delete);
 

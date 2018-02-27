@@ -7,11 +7,12 @@ use std::io::Write;
 use mime_guess;
 
 use error::Result;
+use http::plus::random_alphanumeric;
 
 const BOUNDARY_LEN: usize = 32;
 
 fn gen_boundary() -> String {
-    super::random_alphanumeric(BOUNDARY_LEN)
+    random_alphanumeric(BOUNDARY_LEN)
 }
 
 use hyper::mime::{self, Mime};

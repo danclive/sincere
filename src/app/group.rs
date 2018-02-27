@@ -2,6 +2,8 @@ use super::route::Route;
 use super::context::Context;
 use super::middleware::Middleware;
 
+use hyper::Method;
+
 pub struct Group {
     pub routes: Vec<Route>,
     prefix: String,
@@ -19,11 +21,11 @@ impl Group {
         }
     }
 
-    fn add<H>(&mut self, method: &str, pattern: &str, handle: H) -> &mut Route
+    fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         let route = Route::new(
-            method.parse().unwrap(), 
+            method, 
             self.prefix.clone() + pattern,
             Box::new(handle),
         );
@@ -37,6 +39,9 @@ impl Group {
 
     route!(post);
     route!(head);
+
+    route!(patch);
+    route!(trace);
 
     route!(delete);
 

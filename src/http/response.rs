@@ -15,7 +15,7 @@ use error::Result;
 pub struct Response {
     status_code: StatusCode,
     headers: HashMap<String, String>,
-    data: Vec<u8>,
+    body: Vec<u8>,
 }
 
 impl Response {
@@ -23,7 +23,7 @@ impl Response {
         Response {
             status_code: status_code,
             headers: headers,
-            data: data,
+            body: data,
         }
     }
 
@@ -43,7 +43,7 @@ impl Response {
         let data = data.into();
 
         self.headers.insert("Content-Type".to_owned(), content_type.into());
-        self.data = data;
+        self.body = data;
 
         Ok(self)
     }
@@ -56,7 +56,7 @@ impl Response {
         file.read_to_end(&mut data)?;
 
         self.headers.insert("Content-Type".to_owned(), content_type.into());
-        self.data = data;
+        self.body = data;
 
         Ok(self)
     }
@@ -67,7 +67,7 @@ impl Response {
         let string = string.into();
 
         self.headers.insert("Content-Type".to_owned(), "text/plain; charset=UTF-8".to_owned());
-        self.data = string.into();
+        self.body = string.into();
 
         Ok(self)
     }
@@ -78,7 +78,7 @@ impl Response {
         let string = string.into();
 
         self.headers.insert("Content-Type".to_owned(), "text/html; charset=UTF-8".to_owned());
-        self.data = string.into();
+        self.body = string.into();
 
         Ok(self)
     }
@@ -87,7 +87,7 @@ impl Response {
         let data = serde_json::to_vec(&value)?;
 
         self.headers.insert("Content-Type".to_owned(), "application/json; charset=UTF-8".to_owned());
-        self.data = data;
+        self.body = data;
 
         Ok(self)
     }
@@ -130,12 +130,12 @@ impl Response {
 
         let mut headers = hyper::Headers::with_capacity(16);
 
-        let data_len = self.data.len();
+        let data_len = self.body.len();
 
         if data_len > 0 {
             headers.set(ContentLength(data_len as u64));
 
-            response.set_body(self.data);
+            response.set_body(self.body);
         }
 
         for (key, value) in self.headers.iter() {
