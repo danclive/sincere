@@ -1,3 +1,4 @@
+//! App context.
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -7,17 +8,22 @@ use super::App;
 use http::Request;
 use http::Response;
 
+/// App context.
 pub struct Context<'a> {
+    /// app container reference
     pub app: &'a App,
+    /// http request
     pub request: Request,
+    /// http response
     pub response: Response,
+    /// contexts key-value container
     pub contexts: HashMap<String, Value>,
     stop: bool
 }
 
 impl<'a> Context<'a> {
 
-    pub fn new(app: &App, hyper_request: hyper::Request) -> Context {
+    pub(crate) fn new(app: &App, hyper_request: hyper::Request) -> Context {
         let request = Request::from_hyper_request(hyper_request);
         let response = Response::empty(200);
 
@@ -29,20 +35,55 @@ impl<'a> Context<'a> {
             stop: false
         }
     }
-
+    /// Stop the handle to continue.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use sincere::App;
+    /// use sincere::app::context::Value;
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.get("/", |context| {
+    ///    context.response.from_text("Hello world!").unwrap();
+    /// });
+    ///
+    /// app.before(|context| {
+    ///     if let Some(token) = context.request.header("Token") {
+    ///
+    ///         if token == "token" {
+    ///             context.contexts.insert("id".to_owned(), Value::String(token.clone()));
+    ///         } else {
+    ///             context.response.from_text("Token validation failed!").unwrap();
+    ///             context.stop();
+    ///         }
+    ///
+    ///     } else {
+    ///         context.response.status_code(401);
+    ///         context.stop();
+    ///     }
+    /// });
+    ///
+    /// app.get("/", |context| {
+    ///     let token = context.contexts.get("token").unwrap().as_str().unwrap();
+    ///     println!("token is: {:?}", token);
+    /// });
+    /// ```
     pub fn stop(&mut self) {
         self.stop = true;
     }
 
-    pub fn next(&self) -> bool {
+    pub(crate) fn next(&self) -> bool {
         !self.stop
     }
 
-    pub fn finish(self) -> hyper::Response {
+    pub(crate) fn finish(self) -> hyper::Response {
         self.response.raw_response()
     }
 }
 
+/// Content value
 pub enum Value {
     String(String),
     Int32(i32),

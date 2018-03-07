@@ -1,1 +1,3 @@
-pub mod multipart;
+mod multipart;
+
+pub use self::multipart::Multipart;

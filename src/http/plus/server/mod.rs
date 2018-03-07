@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::fs;
 use std::io::{self, Read, Write};
 
-pub use hyper::mime;
+use hyper::mime;
 
 use http::request::Request;
 use error::Result;
@@ -10,13 +10,13 @@ use http::plus::random_alphanumeric;
 
 use self::multipart::Multipart;
 
-pub mod multipart;
-pub mod boundary;
-pub mod field;
-pub mod save;
+mod multipart;
+mod boundary;
+mod field;
+mod save;
 
 impl Request {
-    pub fn parse_formdata(&mut self) -> Option<FormData> {
+    pub(crate) fn parse_formdata(&mut self) -> Option<FormData> {
         let content_type = match self.content_type() {
             Some(c) => c.to_owned(),
             None => return None

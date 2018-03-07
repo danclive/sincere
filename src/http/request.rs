@@ -28,7 +28,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn from_hyper_request(hyper_request: hyper::Request) -> Request { 
+    pub(crate) fn from_hyper_request(hyper_request: hyper::Request) -> Request { 
         let (method, uri, _http_version, headers, body) = hyper_request.deconstruct();
 
         let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();

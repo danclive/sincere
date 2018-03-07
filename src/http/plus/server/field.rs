@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io::{self, Read, BufRead};
 use std::{str, fmt, error};
 

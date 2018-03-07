@@ -23,9 +23,9 @@ use hyper::mime::{self, Mime};
 /// # Examples
 ///
 /// ```
-/// use sincere::http::plus::client;
+/// use sincere::http::plus::client::Multipart;
 ///
-/// let mut multipart = client::Multipart::new();
+/// let mut multipart = Multipart::new();
 ///
 /// multipart.add_text("hello", "world");
 ///

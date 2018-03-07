@@ -1,3 +1,4 @@
+//! Route
 use std::collections::HashMap;
 
 use hyper::Method;
@@ -6,6 +7,7 @@ use super::Handle;
 use super::context::Context;
 use super::middleware::Middleware;
 
+/// Route
 pub struct Route {
     pattern: String,
     method: Method,

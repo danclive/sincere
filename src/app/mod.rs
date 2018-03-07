@@ -1,3 +1,4 @@
+//! App container.
 use std::sync::Arc;
 use std::rc::Rc;
 
@@ -27,6 +28,20 @@ pub mod context;
 
 pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 
+/// App container.
+///
+/// ```no_run
+/// use sincere::App;
+///
+/// let mut app = App::new();
+///
+/// app.get("/", |context| {
+///    context.response.from_text("Hello world!").unwrap();
+/// });
+///
+/// app.run("127.0.0.1:8000", 20).unwrap();
+/// ```
+///
 pub struct App {
     groups: Vec<Group>,
     begin: Vec<Middleware>,
@@ -37,6 +52,16 @@ pub struct App {
 }
 
 impl App {
+    /// Create an app container.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::App;
+    ///
+    /// let app = App::new();
+    /// ```
+    ///
     pub fn new() -> App {
         App {
             groups: vec![Group::new("")],
@@ -48,7 +73,21 @@ impl App {
         }
     }
 
-    fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
+    /// Add route handle to app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::App;
+    /// use sincere::http::Method;
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.add(Method::Get, "/", |context| {
+    ///     context.response.from_text("Get method!").unwrap();
+    /// });
+    /// ```
+    pub fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         let route = Route::new(
@@ -61,39 +100,334 @@ impl App {
         self.groups.get_mut(0).unwrap().routes.last_mut().unwrap()
     }
 
-    route!(get);
-    route!(put);
+    route!(
+        /// Add route handle to app with GET method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.get("/", |context| {
+        ///    context.response.from_text("Get method!").unwrap();
+        /// });
+        /// ```
+        get
+    );
 
-    route!(post);
-    route!(head);
+    route!(
+        /// Add route handle to app with PUT method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.put("/", |context| {
+        ///    context.response.from_text("Put method!").unwrap();
+        /// });
+        /// ```
+        put
+    );
 
-    route!(patch);
-    route!(trace);
+    route!(
+        /// Add route handle to app with POST method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.post("/", |context| {
+        ///    context.response.from_text("Post method!").unwrap();
+        /// });
+        /// ```
+        post
+    );
 
-    route!(delete);
+    route!(
+        /// Add route handle to app with HEAD method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.head("/", |context| {
+        ///    // no body?
+        ///    // context.response.from_text("Head method!").unwrap();
+        /// });
+        /// ```
+        head
+    );
 
-    route!(options);
-    route!(connect);
+    route!(
+        /// Add route handle to app with PATCH method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.patch("/", |context| {
+        ///    context.response.from_text("Patch method!").unwrap();
+        /// });
+        /// ```
+        patch
+    );
 
-    pub fn mount<F>(&mut self, func: F)
-        where F: Fn() -> Group
+    route!(
+        /// Add route handle to app with TRACE method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.trace("/", |context| {
+        ///    context.response.from_text("Trace method!").unwrap();
+        /// });
+        /// ```
+        trace
+    );
+
+    route!(
+        /// Add route handle to app with DELETE method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.delete("/", |context| {
+        ///    context.response.from_text("Delete method!").unwrap();
+        /// });
+        /// ```
+        delete
+    );
+
+    route!(
+        /// Add route handle to app with OPTIONS method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.options("/", |context| {
+        ///    context.response.from_text("Options method!").unwrap();
+        /// });
+        /// ```
+        options
+    );
+
+    route!(
+        /// Add route handle to app with CONNECT method.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        /// use sincere::http::Method;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.connect("/", |context| {
+        ///    context.response.from_text("Connect method!").unwrap();
+        /// });
+        /// ```
+        connect
+    );
+
+    /// Mount router group to app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::App;
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.mount("/app", |group| {
+    ///
+    ///     group.get("/", |context| {
+    ///         context.response.from_text("Get method!").unwrap();
+    ///     });
+    ///
+    ///     group.post("/", |context| {
+    ///         context.response.from_text("Post method!").unwrap();
+    ///     });
+    ///
+    /// });
+    /// ```
+    pub fn mount<F>(&mut self, prefix: &str, func: F)
+        where F: Fn(&mut Group)
     {
-        let group = func();
+        let mut group = Group::new(prefix); 
 
+        func(&mut group);
+        
         self.groups.push(group)
     }
 
-    middleware!(begin);
-    middleware!(before);
-    middleware!(after);
-    middleware!(finish);
+    /// Mount router group to app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::App;
+    /// use sincere::app::Group;
+    ///
+    /// let mut group = Group::new("/app");
+    ///
+    /// group.get("/", |context| {
+    ///     context.response.from_text("Get method!").unwrap();
+    /// });
+    ///
+    /// group.post("/", |context| {
+    ///     context.response.from_text("Post method!").unwrap();
+    /// });
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.mount_group(group);
+    ///
+    pub fn mount_group(&mut self, group: Group) {
+        self.groups.push(group)
+    }
 
-    pub fn use_middleware<F>(&mut self, func: F)
+    middleware!(
+        /// Add `begin handle` to app.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.begin(|context| {
+        ///     context.response.from_text("begin!").unwrap();
+        /// });
+        /// ```
+        begin
+    );
+
+    middleware!(
+        /// Add `before handle` to app.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.before(|context| {
+        ///     context.response.from_text("before!").unwrap();
+        /// });
+        /// ```
+        before
+    );
+
+    middleware!(
+        /// Add `after handle` to app.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.after(|context| {
+        ///     context.response.from_text("after!").unwrap();
+        /// });
+        /// ```
+        after
+    );
+
+    middleware!(
+        /// Add `finish handle` to app.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use sincere::App;
+        ///
+        /// let mut app = App::new();
+        ///
+        /// app.finish(|context| {
+        ///     context.response.from_text("finish!").unwrap();
+        /// });
+        /// ```
+        finish
+    );
+
+    /// Use middleware
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use sincere::App;
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.middleware(|app| {
+    ///     
+    ///     app.begin(|context| {
+    ///         context.response.from_text("Hello world!").unwrap();
+    ///     });
+    ///
+    ///     app.finish(|context| {
+    ///         context.response.from_text("Hello world!").unwrap();
+    ///     });
+    ///
+    /// });
+    /// ```
+    pub fn middleware<F>(&mut self, func: F)
         where F: Fn(&mut App)
     {
         func(self)
     }
 
+    /// Add `not-found handle` to app.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use sincere::App;
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.not_found(|context| {
+    ///     context.response.status_code(404).from_text("Not Found!").unwrap();
+    /// });
+    /// ```
     pub fn not_found<H>(&mut self, handle: H)
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
@@ -102,7 +436,8 @@ impl App {
         });
     }
 
-    pub fn handle(&self, request: Request) -> Response {
+    /// handle
+    fn handle(&self, request: Request) -> Response {
 
         let mut context = Context::new(self, request);
 
@@ -200,6 +535,19 @@ impl App {
         context.finish()
     }
 
+    /// Run app with addr and thread_pool size.
+    ///
+    /// ```no_run
+    /// use sincere::App;
+    ///
+    /// let mut app = App::new();
+    ///
+    /// app.get("/", |context| {
+    ///    context.response.from_text("Hello world!").unwrap();
+    /// });
+    ///
+    /// app.run("127.0.0.1:8000", 20).unwrap();
+    /// ```
     pub fn run(self, addr: &str, thread_size: usize) -> Result<()> {
 
         let app_service = AppService {

@@ -25,7 +25,7 @@ Don't forget add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sincere = "0.5.5"
+sincere = "0.5.8"
 ```
 Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello world` on the screen.
 
@@ -74,7 +74,7 @@ fn main() {
     // /user/123
     app.get("/{id:[0-9]+}", ...);
 
-    app.mount(user_group::handle);
+    app.mount_group(user_group::handle);
 
     app.run("127.0.0.1:8000");
 }
@@ -154,7 +154,7 @@ fn main() {
 
 ```rust
 ...
- app.begin(...).begin(...);
+app.begin(...).begin(...);
 
 app.begin(...).finish(...);
 

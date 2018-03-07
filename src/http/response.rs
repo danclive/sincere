@@ -122,7 +122,7 @@ impl Response {
     }
 
     #[inline]
-    pub fn raw_response(self) -> hyper::Response {
+    pub(crate) fn raw_response(self) -> hyper::Response {
 
         let mut response = hyper::Response::new();
 

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::borrow::Borrow;
 use std::io::prelude::*;
 use std::sync::Arc;
