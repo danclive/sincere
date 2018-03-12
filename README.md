@@ -29,6 +29,10 @@ sincere = "0.5.8"
 ```
 Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello world` on the screen.
 
+## API documentation: 
+
+- [master](https://docs.rs/sincere)
+
 ## Guide
 
 ### Routing
