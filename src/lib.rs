@@ -60,6 +60,7 @@ extern crate futures_cpupool;
 #[macro_use]
 extern crate queen_log;
 extern crate mime_guess;
+pub extern crate nson;
 
 pub use error::Error;
 

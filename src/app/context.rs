@@ -1,8 +1,7 @@
 //! App context.
-use std::collections::HashMap;
-use std::time::Instant;
-
 use hyper;
+
+use nson::Object;
 
 use super::App;
 use http::Request;
@@ -17,7 +16,7 @@ pub struct Context<'a> {
     /// http response
     pub response: Response,
     /// contexts key-value container
-    pub contexts: HashMap<String, Value>,
+    pub contexts: Object,
     stop: bool
 }
 
@@ -31,7 +30,7 @@ impl<'a> Context<'a> {
             app: app,
             request: request,
             response: response,
-            contexts: HashMap::new(),
+            contexts: Object::new(),
             stop: false
         }
     }
@@ -81,98 +80,55 @@ impl<'a> Context<'a> {
     pub(crate) fn finish(self) -> hyper::Response {
         self.response.raw_response()
     }
+
+    /*
+    pub fn set<K: Into<String>, V: ToContext>(&mut self, key: K, value: V) {
+        let v: Value = value.to_context();
+        self.contexts.insert(key.into(), v);
+    }
+
+    pub fn get<K: Into<String>, V: FromContext>(&self, key: K) -> Option<V> {
+        let value = self.contexts.get(&key.into());
+
+        if value.is_none() {
+            return None;
+        }
+
+        <V as FromContext>::from_context(value.unwrap())
+    }
+    */
 }
 
-/// Content value
-pub enum Value {
-    String(String),
-    Int32(i32),
-    Int64(i64),
-    Usize(usize),
-    Isize(isize),
-    Double(f64),
-    Array(Vec<Value>),
-    Map(HashMap<Value, Value>),
-    Boolean(bool),
-    Binary(Vec<u8>),
-    Instant(Instant)
+/*
+pub trait ToContext {
+    fn to_context(self) -> Value;
 }
 
-impl Value {
-    pub fn as_str(&self) -> Option<&str> {
-        match *self {
-            Value::String(ref s) => Some(s),
-            _ => None,
-        }
-    }
+pub trait FromContext: Sized {
+    fn from_context(value: &Value) -> Option<Self>;
+}
 
-    pub fn as_i32(&self) -> Option<i32> {
-        match *self {
-            Value::Int32(ref i) => Some(*i),
-            _ => None
-        }
-    }
-
-    pub fn as_i64(&self) -> Option<i64> {
-        match *self {
-            Value::Int64(ref i) => Some(*i),
-            _ => None
-        }
-    }
-
-    pub fn as_usize(&self) -> Option<usize> {
-        match *self {
-            Value::Usize(ref i) => Some(*i),
-            _ => None
-        }
-    }
-
-    pub fn as_isize(&self) -> Option<isize> {
-        match *self {
-            Value::Isize(ref i) => Some(*i),
-            _ => None
-        }
-    }
-
-    pub fn as_f64(&self) -> Option<f64> {
-        match *self {
-            Value::Double(ref i) => Some(*i),
-            _ => None
-        }
-    }
-
-    pub fn as_vec(&self) -> Option<&Vec<Value>> {
-        match *self {
-            Value::Array(ref i) => Some(i),
-            _ => None
-        }
-    }
-
-    pub fn as_map(&self) -> Option<&HashMap<Value, Value>> {
-        match *self {
-            Value::Map(ref i) => Some(i),
-            _ => None
-        }
-    }
-
-    pub fn as_bool(&self) -> Option<bool> {
-        match *self {
-            Value::Boolean(ref i) => Some(*i),
-            _ => None
-        }
-    }
-
-    pub fn as_binary(&self) -> Option<&Vec<u8>> {
-        match *self {
-            Value::Binary(ref i) => Some(i),
-            _ => None
-        }
-    }
-
-    pub fn as_instant(&self) -> Option<&Instant> {
-        match *self {
-            Value::Instant(ref i) => Some(i),
-            _ => None
-        }
+impl ToContext for i32 {
+    fn to_context(self) -> Value {
+        Value::Int32(self)
     }
 }
+
+impl FromContext for i32 {
+    fn from_context(value: &Value) -> Option<Self> {
+        value.as_i32()
+    }
+}
+
+impl ToContext for i64 {
+    fn to_context(self) -> Value {
+        Value::Int64(self)
+    }
+}
+
+impl FromContext for i64 {
+    fn from_context(value: &Value) -> Option<Self> {
+        value.as_i64()
+    }
+}
+*/
