@@ -1,6 +1,6 @@
 [package]
 name          = "sincere"
-version       = "0.5.8"
+version       = "0.5.9"
 license       = "MIT"
 authors       = ["mitum <dangcheng@hotmail.com>"]
 description   = "web framework"
