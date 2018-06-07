@@ -8,7 +8,8 @@ use futures::future::Future;
 use futures_cpupool::CpuPool;
 
 use hyper;
-use hyper::server::{Http, Request, Response, Service};
+use hyper::{Request, Response};
+//use hyper::server::{Http, Request, Response, Service};
 use hyper::Method;
 
 use queen_log::color::Print;
