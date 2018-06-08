@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use regex::Regex;
 
-use futures::future::Future;
+use futures::future::{self, Future};
 use futures_cpupool::CpuPool;
 
 use hyper::{self, Request, Response, Body, Server};
@@ -552,10 +552,10 @@ impl App {
     /// ```
     pub fn run(self, addr: &str, thread_size: usize) -> Result<()> {
 
-        // let app_service = AppService {
-        //     inner: Arc::new(self),
-        //     thread_pool: CpuPool::new(thread_size)
-        // };
+        let app_service = AppService {
+            inner: Arc::new(self),
+            thread_pool: CpuPool::new(thread_size)
+        };
 
         // let app = Rc::new(app_service);
 
@@ -579,11 +579,11 @@ impl App {
 
         let addr = addr.parse().expect("Address is not valid");
         let thread_pool = CpuPool::new(thread_size);
-        let app = Arc::new(self);
+        //let app = Arc::new(self);
         
-        let service = service_fn(|req: Request<Body>| {
-            Ok(Response::new(Body::from("Hello World")))
-        });
+        // let service = service_fn(|req: Request<Body>| {
+        //     Ok(Response::new(Body::from("Hello World")))
+        // });
 
         //let server = Http::new().bind(&addr, move || Ok(app.clone()))?;
         //server.run()?;
@@ -594,20 +594,36 @@ impl App {
         // let f = || {
         //     app_service
         // };
+        //let app2 = app.clone();
 
-        let server = Server::bind(&addr);
+        let echo2 = move |req: Request<Body>| -> BoxFut {
+
+            //let app = &app2;
+            let mut response = Response::new(Body::empty());
+
+            Box::new(future::ok(response))
+        };
+
+        let server = Server::bind(&addr).serve(move || app_service);
 
         Ok(())
     }
 }
 
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
+type FnA = Fn(Request<Body>) -> BoxFut;
+
+// fn echo(req: Request<Body>) -> BoxFut {
+//     let mut response = Response::new(Body::empty());
+
+//     Box::new(future::ok(response))
+// }
 
 struct AppService {
     inner: Arc<App>,
     thread_pool: CpuPool
 }
-/*
+
 impl Service for AppService {
     //type Request = Request;
     //type Response = Response;
@@ -631,4 +647,3 @@ impl Service for AppService {
         Box::new(msg)
     }
 }
-*/
