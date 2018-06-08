@@ -5,9 +5,11 @@ use serde_json;
 
 use futures::{Future, Stream};
 
-use hyper::{self, Uri, Method, Headers};
-use hyper::header::ContentType;
-use hyper::mime;
+use hyper::{self, Uri, Method, Version, HeaderMap};
+//use hyper::header::ContentType;
+//use hyper::mime;
+use hyper::header::{CONTENT_TYPE};
+use mime;
 
 use util::url;
 
@@ -19,7 +21,8 @@ use error::Result;
 pub struct Request {
     uri: Uri,
     method: Method,
-    headers: Headers,
+    version: Version,
+    headers: HeaderMap,
     params: HashMap<String, String>,
     querys: Vec<(String, String)>,
     posts: Vec<(String, String)>,
@@ -28,26 +31,43 @@ pub struct Request {
 }
 
 impl Request {
-    pub(crate) fn from_hyper_request(hyper_request: hyper::Request) -> Request { 
-        let (method, uri, _http_version, headers, body) = hyper_request.deconstruct();
+    pub(crate) fn from_hyper_request(hyper_request: hyper::Request<hyper::Body>) -> Request { 
+        // let (method, uri, _http_version, headers, body) = hyper_request.deconstruct();
 
-        let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();
+        // let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();
+
+        // let mut request = Request {
+        //     uri: uri,
+        //     method: method,
+        //     headers: headers,
+        //     params: HashMap::new(),
+        //     querys: Vec::new(),
+        //     posts: Vec::new(),
+        //     files: Vec::new(),
+        //     body: body
+        // };
+
+        // request.parse_query();
+        // //request.parse_post();
+
+        // request
+        let (parts, body) = hyper_request.into_parts();
 
         let mut request = Request {
-            uri: uri,
-            method: method,
-            headers: headers,
+            uri: parts.uri,
+            method: parts.method,
+            version: parts.version,
+            headers: parts.headers,
             params: HashMap::new(),
             querys: Vec::new(),
             posts: Vec::new(),
             files: Vec::new(),
-            body: body
+            body: Vec::new()
         };
 
-        request.parse_query();
-        request.parse_post();
-
-        request
+        unsafe {
+            ::std::mem::zeroed()
+        }
     }
 
     #[inline]
@@ -91,30 +111,31 @@ impl Request {
     }
 
     pub fn header(&self, name: &str) -> Option<String> {
-        match self.headers.get_raw(name) {
-            Some(value) => {
-                match value.one() {
-                    Some(value) => {
-                        let value = String::from_utf8_lossy(value);
+        // match self.headers.get_raw(name) {
+        //     Some(value) => {
+        //         match value.one() {
+        //             Some(value) => {
+        //                 let value = String::from_utf8_lossy(value);
 
-                        return Some(value.to_string())
-                    },
-                    None => return None
-                }
-            }
-            None => return None
-        };
+        //                 return Some(value.to_string())
+        //             },
+        //             None => return None
+        //         }
+        //     }
+        //     None => return None
+        // };
+        None
     }
 
     #[inline]
-    pub fn headers(&self) -> &Headers {
+    pub fn headers(&self) -> &HeaderMap {
         &self.headers
     }
 
-    #[inline]
-    pub fn content_type(&self) -> Option<&ContentType> {
-        self.headers.get::<ContentType>()
-    }
+    // #[inline]
+    // pub fn content_type(&self) -> Option<&ContentType> {
+    //     self.headers.get::<ContentType>()
+    // }
 
     #[inline]
     fn parse_query(&mut self) {
@@ -126,29 +147,29 @@ impl Request {
         self.querys = url::from_str::<Vec<(String, String)>>(&url).unwrap_or_default();
     }
 
-    #[inline]
-    fn parse_post(&mut self) {
+    // #[inline]
+    // fn parse_post(&mut self) {
 
-        let content_type = match self.content_type() {
-            Some(c) => c.to_owned(),
-            None => return
-        };
+    //     let content_type = match self.content_type() {
+    //         Some(c) => c.to_owned(),
+    //         None => return
+    //     };
 
-        if content_type == ContentType::form_url_encoded() {
+    //     if content_type == ContentType::form_url_encoded() {
 
-            let params = String::from_utf8_lossy(&self.body);
-            self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
+    //         let params = String::from_utf8_lossy(&self.body);
+    //         self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
 
-        } else if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
+    //     } else if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
 
-            let form_data = self.parse_formdata();
+    //         let form_data = self.parse_formdata();
 
-            if let Some(form_data) = form_data {
-                self.posts = form_data.fields;
-                self.files = form_data.files;
-            }
-        }
-    }
+    //         if let Some(form_data) = form_data {
+    //             self.posts = form_data.fields;
+    //             self.files = form_data.files;
+    //         }
+    //     }
+    // }
 
     #[inline]
     pub fn has_file(&self) -> bool {

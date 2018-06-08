@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json;
 
 use hyper;
-use hyper::header::ContentLength;
+//use hyper::header::ContentLength;
 
 use super::status_code::StatusCode;
 use error::Result;
@@ -122,8 +122,8 @@ impl Response {
     }
 
     #[inline]
-    pub(crate) fn raw_response(self) -> hyper::Response {
-
+    pub(crate) fn raw_response(self) -> hyper::Response<hyper::Body> {
+        /*
         let mut response = hyper::Response::new();
 
         response.set_status(hyper::StatusCode::try_from(self.get_status_code()).unwrap());
@@ -145,5 +145,9 @@ impl Response {
         response = response.with_headers(headers);
 
         response
+        */
+        unsafe {
+            ::std::mem::zeroed()
+        }
     }
 }

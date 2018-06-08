@@ -7,8 +7,9 @@ use regex::Regex;
 use futures::future::Future;
 use futures_cpupool::CpuPool;
 
-use hyper;
-use hyper::{Request, Response};
+use hyper::{self, Request, Response, Body, Server};
+use hyper::service::{Service, NewService, service_fn};
+
 //use hyper::server::{Http, Request, Response, Service};
 use hyper::Method;
 
@@ -438,7 +439,7 @@ impl App {
     }
 
     /// handle
-    fn handle(&self, request: Request) -> Response {
+    fn handle(&self, request: Request<Body>) -> Response<Body> {
 
         let mut context = Context::new(self, request);
 
@@ -551,12 +552,12 @@ impl App {
     /// ```
     pub fn run(self, addr: &str, thread_size: usize) -> Result<()> {
 
-        let app_service = AppService {
-            inner: Arc::new(self),
-            thread_pool: CpuPool::new(thread_size)
-        };
+        // let app_service = AppService {
+        //     inner: Arc::new(self),
+        //     thread_pool: CpuPool::new(thread_size)
+        // };
 
-        let app = Rc::new(app_service);
+        // let app = Rc::new(app_service);
 
         let sincere_logo = Print::green(
     r"
@@ -577,25 +578,47 @@ impl App {
         );
 
         let addr = addr.parse().expect("Address is not valid");
-        let server = Http::new().bind(&addr, move || Ok(app.clone()))?;
-        server.run()?;
+        let thread_pool = CpuPool::new(thread_size);
+        let app = Arc::new(self);
+        
+        let service = service_fn(|req: Request<Body>| {
+            Ok(Response::new(Body::from("Hello World")))
+        });
+
+        //let server = Http::new().bind(&addr, move || Ok(app.clone()))?;
+        //server.run()?;
+        // let new_svc = || {
+
+        // };
+
+        // let f = || {
+        //     app_service
+        // };
+
+        let server = Server::bind(&addr);
 
         Ok(())
     }
 }
 
+type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
+
 struct AppService {
     inner: Arc<App>,
     thread_pool: CpuPool
 }
-
+/*
 impl Service for AppService {
-    type Request = Request;
-    type Response = Response;
+    //type Request = Request;
+    //type Response = Response;
+    //type Error = hyper::Error;
+    //type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
+    type ReqBody = Body;
+    type ResBody = Body;
     type Error = hyper::Error;
-    type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
+    type Future = Box<Future<Item = Response<Self::ResBody>, Error = Self::Error> + Send>;
 
-    fn call(&self, request: Request) -> Self::Future {
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
 
         let app = self.inner.clone();
 
@@ -608,3 +631,4 @@ impl Service for AppService {
         Box::new(msg)
     }
 }
+*/
