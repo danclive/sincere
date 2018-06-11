@@ -17,27 +17,24 @@ mod save;
 
 impl Request {
     pub(crate) fn parse_formdata(&mut self) -> Option<FormData> {
-        // let content_type = match self.content_type() {
-        //     Some(c) => c.to_owned(),
-        //     None => return None
-        // };
+        let content_type = match self.content_type() {
+            Some(c) => c.to_owned(),
+            None => return None
+        };
 
-        // if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
-        //     let boundary = if let Some(boundary) = content_type.get_param(mime::BOUNDARY) {
-        //         boundary.as_str()
-        //     } else {
-        //         return None
-        //     };
+        if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
+            let boundary = if let Some(boundary) = content_type.get_param(mime::BOUNDARY) {
+                boundary.as_str()
+            } else {
+                return None
+            };
 
-        //     let reader = io::Cursor::new(self.body());
+            let reader = io::Cursor::new(self.body());
 
-        //     return Some(FormData::with_body(reader, boundary));
-        // }
-
-        // None
-        unsafe {
-            ::std::mem::zeroed()
+            return Some(FormData::with_body(reader, boundary));
         }
+
+        None
     }
 }
 

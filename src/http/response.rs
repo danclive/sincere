@@ -146,8 +146,20 @@ impl Response {
 
         response
         */
-        unsafe {
-            ::std::mem::zeroed()
+
+        // let mut response = hyper::Response::new(hyper::Body::empty());
+
+        // if self.body.len() > 0 {
+        //     *response.body_mut() = hyper::Body::from(self.body);
+        // }
+        let mut header_builder = hyper::Response::builder();
+
+        header_builder.status(self.get_status_code());
+
+        for (key, value) in self.headers.iter() {
+            header_builder.header(&**key, &**value);
         }
+
+        header_builder.body(hyper::Body::from(self.body)).unwrap()
     }
 }

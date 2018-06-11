@@ -7,3 +7,7 @@ mod request;
 mod response;
 mod status_code;
 pub mod plus;
+
+pub mod mime {
+	pub use mime::*;
+}

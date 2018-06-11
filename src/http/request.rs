@@ -9,7 +9,7 @@ use hyper::{self, Uri, Method, Version, HeaderMap};
 //use hyper::header::ContentType;
 //use hyper::mime;
 use hyper::header::{CONTENT_TYPE};
-use mime;
+use mime::{self, Mime};
 
 use util::url;
 
@@ -32,26 +32,8 @@ pub struct Request {
 
 impl Request {
     pub(crate) fn from_hyper_request(hyper_request: hyper::Request<hyper::Body>) -> Request { 
-        // let (method, uri, _http_version, headers, body) = hyper_request.deconstruct();
-
-        // let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();
-
-        // let mut request = Request {
-        //     uri: uri,
-        //     method: method,
-        //     headers: headers,
-        //     params: HashMap::new(),
-        //     querys: Vec::new(),
-        //     posts: Vec::new(),
-        //     files: Vec::new(),
-        //     body: body
-        // };
-
-        // request.parse_query();
-        // //request.parse_post();
-
-        // request
         let (parts, body) = hyper_request.into_parts();
+        let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();
 
         let mut request = Request {
             uri: parts.uri,
@@ -62,12 +44,13 @@ impl Request {
             querys: Vec::new(),
             posts: Vec::new(),
             files: Vec::new(),
-            body: Vec::new()
+            body: body
         };
 
-        unsafe {
-            ::std::mem::zeroed()
-        }
+        request.parse_query();
+        request.parse_post();
+
+        request
     }
 
     #[inline]
@@ -111,19 +94,11 @@ impl Request {
     }
 
     pub fn header(&self, name: &str) -> Option<String> {
-        // match self.headers.get_raw(name) {
-        //     Some(value) => {
-        //         match value.one() {
-        //             Some(value) => {
-        //                 let value = String::from_utf8_lossy(value);
+        if let Some(value) = self.headers.get(name) {
+            let value = String::from_utf8_lossy(value.as_bytes());
+            return Some(value.to_string())
+        }
 
-        //                 return Some(value.to_string())
-        //             },
-        //             None => return None
-        //         }
-        //     }
-        //     None => return None
-        // };
         None
     }
 
@@ -132,10 +107,18 @@ impl Request {
         &self.headers
     }
 
-    // #[inline]
-    // pub fn content_type(&self) -> Option<&ContentType> {
-    //     self.headers.get::<ContentType>()
-    // }
+    #[inline]
+    pub fn content_type(&self) -> Option<Mime> {
+        if let Some(value) = self.headers.get(CONTENT_TYPE) {
+            if let Ok(value) = value.to_str() {
+                if let Ok(mime) = value.parse::<Mime>() {
+                    return Some(mime)
+                }
+            }
+        }
+
+        None
+    }
 
     #[inline]
     fn parse_query(&mut self) {
@@ -147,29 +130,29 @@ impl Request {
         self.querys = url::from_str::<Vec<(String, String)>>(&url).unwrap_or_default();
     }
 
-    // #[inline]
-    // fn parse_post(&mut self) {
+    #[inline]
+    fn parse_post(&mut self) {
 
-    //     let content_type = match self.content_type() {
-    //         Some(c) => c.to_owned(),
-    //         None => return
-    //     };
+        let content_type = match self.content_type() {
+            Some(c) => c.to_owned(),
+            None => return
+        };
 
-    //     if content_type == ContentType::form_url_encoded() {
+        if content_type == mime::APPLICATION_WWW_FORM_URLENCODED {
 
-    //         let params = String::from_utf8_lossy(&self.body);
-    //         self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
+            let params = String::from_utf8_lossy(&self.body);
+            self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
 
-    //     } else if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
+        } else if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
 
-    //         let form_data = self.parse_formdata();
+            let form_data = self.parse_formdata();
 
-    //         if let Some(form_data) = form_data {
-    //             self.posts = form_data.fields;
-    //             self.files = form_data.files;
-    //         }
-    //     }
-    // }
+            if let Some(form_data) = form_data {
+                self.posts = form_data.fields;
+                self.files = form_data.files;
+            }
+        }
+    }
 
     #[inline]
     pub fn has_file(&self) -> bool {
