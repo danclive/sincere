@@ -8,7 +8,7 @@ pub use self::route::Route;
 pub use self::group::Group;
 use self::middleware::Middleware;
 use self::context::Context;
-use self::run::AppHandle;
+//use self::run::AppHandle;
 pub use self::run::run;
 
 #[macro_use]
@@ -429,9 +429,6 @@ impl App {
             inner: Box::new(handle),
         });
     }
-}
-
-impl AppHandle for App {
         /// handle
     fn handle(&self, request: Request<Body>) -> Response<Body> {
 

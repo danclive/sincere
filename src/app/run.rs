@@ -2,7 +2,7 @@
 use futures::future::Future;
 use futures_cpupool::CpuPool;
 
-use hyper::{self, Request, Response, Body, Server};
+use hyper::{self, Response, Body, Server};
 use hyper::service::service_fn;
 
 use queen_log::color::Print;
@@ -10,29 +10,9 @@ use queen_log::color::Print;
 use error::Result;
 use app::App;
 
-pub trait AppHandle {
-    fn handle(&self, request: Request<Body>) -> Response<Body>;
-}
-
-struct DefaultApp;
-
-impl AppHandle for DefaultApp {
-    fn handle(&self, _request: Request<Body>) -> Response<Body> {
-        unsafe {
-            ::std::mem::zeroed()
-        }
-    }
-}
-
-static mut APP: &'static AppHandle = &DefaultApp;
-
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
 pub fn run(addr: &str, thread_size: usize, app: &'static App) -> Result<()> {
-
-    unsafe {
-        APP = app;
-    }
 
 	let sincere_logo = Print::green(
     r"
@@ -61,7 +41,7 @@ pub fn run(addr: &str, thread_size: usize, app: &'static App) -> Result<()> {
 
         service_fn(move |req| -> BoxFut {
             let rep = pool.spawn_fn(move || {
-                let response = unsafe { APP.handle(req) };
+                let response = app.handle(req);
                 Ok(response)
             });
 
