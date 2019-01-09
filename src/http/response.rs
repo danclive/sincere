@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json;
 
 use hyper;
-use hyper::header::ContentLength;
+//use hyper::header::ContentLength;
 
 use super::status_code::StatusCode;
 use error::Result;
@@ -122,8 +122,8 @@ impl Response {
     }
 
     #[inline]
-    pub(crate) fn raw_response(self) -> hyper::Response {
-
+    pub(crate) fn raw_response(self) -> hyper::Response<hyper::Body> {
+        /*
         let mut response = hyper::Response::new();
 
         response.set_status(hyper::StatusCode::try_from(self.get_status_code()).unwrap());
@@ -145,5 +145,21 @@ impl Response {
         response = response.with_headers(headers);
 
         response
+        */
+
+        // let mut response = hyper::Response::new(hyper::Body::empty());
+
+        // if self.body.len() > 0 {
+        //     *response.body_mut() = hyper::Body::from(self.body);
+        // }
+        let mut header_builder = hyper::Response::builder();
+
+        header_builder.status(self.get_status_code());
+
+        for (key, value) in self.headers.iter() {
+            header_builder.header(&**key, &**value);
+        }
+
+        header_builder.body(hyper::Body::from(self.body)).unwrap()
     }
 }

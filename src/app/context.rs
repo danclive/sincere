@@ -22,7 +22,7 @@ pub struct Context<'a> {
 
 impl<'a> Context<'a> {
 
-    pub(crate) fn new(app: &App, hyper_request: hyper::Request) -> Context {
+    pub(crate) fn new(app: &App, hyper_request: hyper::Request<hyper::Body>) -> Context {
         let request = Request::from_hyper_request(hyper_request);
         let response = Response::empty(200);
 
@@ -77,7 +77,7 @@ impl<'a> Context<'a> {
         !self.stop
     }
 
-    pub(crate) fn finish(self) -> hyper::Response {
+    pub(crate) fn finish(self) -> hyper::Response<hyper::Body> {
         self.response.raw_response()
     }
 

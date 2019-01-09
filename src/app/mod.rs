@@ -1,23 +1,15 @@
 //! App container.
-use std::sync::Arc;
-use std::rc::Rc;
-
 use regex::Regex;
 
-use futures::future::Future;
-use futures_cpupool::CpuPool;
-
-use hyper;
-use hyper::server::{Http, Request, Response, Service};
+use hyper::{Request, Response, Body};
 use hyper::Method;
 
-use queen_log::color::Print;
-
-use error::Result;
 pub use self::route::Route;
 pub use self::group::Group;
 use self::middleware::Middleware;
 use self::context::Context;
+//use self::run::AppHandle;
+pub use self::run::run;
 
 #[macro_use]
 mod macros;
@@ -25,6 +17,7 @@ mod route;
 mod group;
 pub mod middleware;
 pub mod context;
+mod run;
 
 pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 
@@ -42,6 +35,7 @@ pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 /// app.run("127.0.0.1:8000", 20).unwrap();
 /// ```
 ///
+#[derive(Default)]
 pub struct App {
     groups: Vec<Group>,
     begin: Vec<Middleware>,
@@ -435,15 +429,14 @@ impl App {
             inner: Box::new(handle),
         });
     }
-
-    /// handle
-    fn handle(&self, request: Request) -> Response {
+        /// handle
+    fn handle(&self, request: Request<Body>) -> Response<Body> {
 
         let mut context = Context::new(self, request);
 
         let mut route_found = false;
 
-        for begin in self.begin.iter() {         
+        for begin in self.begin.iter() {
             begin.execute_always(&mut context);
         }
 
@@ -495,7 +488,7 @@ impl App {
                     }
 
                     if route_found {
-                                
+
                         for before in self.before.iter() {
                             before.execute(&mut context);
                         }
@@ -533,77 +526,5 @@ impl App {
         }
 
         context.finish()
-    }
-
-    /// Run app with addr and thread_pool size.
-    ///
-    /// ```no_run
-    /// use sincere::App;
-    ///
-    /// let mut app = App::new();
-    ///
-    /// app.get("/", |context| {
-    ///    context.response.from_text("Hello world!").unwrap();
-    /// });
-    ///
-    /// app.run("127.0.0.1:8000", 20).unwrap();
-    /// ```
-    pub fn run(self, addr: &str, thread_size: usize) -> Result<()> {
-
-        let app_service = AppService {
-            inner: Arc::new(self),
-            thread_pool: CpuPool::new(thread_size)
-        };
-
-        let app = Rc::new(app_service);
-
-        let sincere_logo = Print::green(
-    r"
-     __.._..  . __ .___.__ .___
-    (__  | |\ |/  `[__ [__)[__
-    .__)_|_| \|\__.[___|  \[___
-    "
-        );
-
-        println!("{}", sincere_logo);
-        println!(
-            "    {}{} {} {} {}",
-            Print::green("Server running at http://"),
-            Print::green(addr),
-            Print::green("on"),
-            Print::green(thread_size),
-            Print::green("threads.")
-        );
-
-        let addr = addr.parse().expect("Address is not valid");
-        let server = Http::new().bind(&addr, move || Ok(app.clone()))?;
-        server.run()?;
-
-        Ok(())
-    }
-}
-
-struct AppService {
-    inner: Arc<App>,
-    thread_pool: CpuPool
-}
-
-impl Service for AppService {
-    type Request = Request;
-    type Response = Response;
-    type Error = hyper::Error;
-    type Future = Box<Future<Item=Self::Response, Error=Self::Error>>;
-
-    fn call(&self, request: Request) -> Self::Future {
-
-        let app = self.inner.clone();
-
-        let msg = self.thread_pool.spawn_fn(move || {
-            let response = app.handle(request);
-
-            Ok(response)
-        });
-
-        Box::new(msg)
     }
 }

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::fs;
 use std::io::{self, Read, Write};
 
-use hyper::mime;
+use mime;
 
 use http::request::Request;
 use error::Result;

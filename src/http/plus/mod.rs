@@ -1,10 +1,9 @@
 use rand::{self, Rng};
+use rand::distributions::Alphanumeric;
 
 pub mod server;
 pub mod client;
 
-pub use hyper::mime;
-
 pub fn random_alphanumeric(len: usize) -> String {
-    rand::thread_rng().gen_ascii_chars().take(len).collect()
+    rand::thread_rng().sample_iter(&Alphanumeric).take(len).collect()
 }

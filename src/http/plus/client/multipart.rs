@@ -15,7 +15,7 @@ fn gen_boundary() -> String {
     random_alphanumeric(BOUNDARY_LEN)
 }
 
-use hyper::mime::{self, Mime};
+use mime::{self, Mime};
 
 /// Create a structure to process the multipart/form-data data format for
 /// the client to initiate the request.

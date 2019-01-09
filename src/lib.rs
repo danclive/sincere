@@ -59,6 +59,7 @@ extern crate futures_cpupool;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate queen_log;
+extern crate mime;
 extern crate mime_guess;
 pub extern crate nson;
 
