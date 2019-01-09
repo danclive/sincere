@@ -7,8 +7,8 @@ use hyper::service::service_fn;
 
 use queen_log::color::Print;
 
-use error::Result;
-use app::App;
+use crate::error::Result;
+use crate::app::App;
 
 type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 

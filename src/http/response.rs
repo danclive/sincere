@@ -9,7 +9,7 @@ use hyper;
 //use hyper::header::ContentLength;
 
 use super::status_code::StatusCode;
-use error::Result;
+use crate::error::Result;
 
 #[derive(Debug)]
 pub struct Response {

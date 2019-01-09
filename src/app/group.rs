@@ -2,8 +2,9 @@
 use super::route::Route;
 use super::context::Context;
 use super::middleware::Middleware;
+use crate::http::Method;
 
-use hyper::Method;
+// use hyper::Method;
 
 /// Route group
 ///
@@ -83,7 +84,7 @@ impl Group {
     ///
     /// let mut group = Group::new("/app");
     ///
-    /// group.add(Method::Get, "/", |context| {
+    /// group.add(Method::GET, "/", |context| {
     ///     context.response.from_text("Get method!").unwrap();
     /// });
     /// ```

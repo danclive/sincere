@@ -63,15 +63,14 @@ extern crate mime;
 extern crate mime_guess;
 pub extern crate nson;
 
-pub use error::Error;
-
 pub mod http;
 pub mod app;
 pub mod text;
 pub mod util;
 pub mod error;
 
-pub use app::App;
+pub use self::app::App;
+pub use self::error::Error;
 
 #[doc(hidden)]
 pub use queen_log::*;

@@ -1,11 +1,11 @@
 //! App context.
 use hyper;
 
-use nson::Object;
+use nson::Message;
 
 use super::App;
-use http::Request;
-use http::Response;
+use crate::http::Request;
+use crate::http::Response;
 
 /// App context.
 pub struct Context<'a> {
@@ -16,7 +16,7 @@ pub struct Context<'a> {
     /// http response
     pub response: Response,
     /// contexts key-value container
-    pub contexts: Object,
+    pub contexts: Message,
     stop: bool
 }
 
@@ -30,7 +30,7 @@ impl<'a> Context<'a> {
             app: app,
             request: request,
             response: response,
-            contexts: Object::new(),
+            contexts: Message::new(),
             stop: false
         }
     }
@@ -40,7 +40,6 @@ impl<'a> Context<'a> {
     ///
     /// ```no_run
     /// use sincere::App;
-    /// use sincere::app::context::Value;
     ///
     /// let mut app = App::new();
     ///
@@ -52,7 +51,7 @@ impl<'a> Context<'a> {
     ///     if let Some(token) = context.request.header("Token") {
     ///
     ///         if token == "token" {
-    ///             context.contexts.insert("id".to_owned(), Value::String(token.clone()));
+    ///             context.contexts.insert("id".to_owned(), token.clone());
     ///         } else {
     ///             context.response.from_text("Token validation failed!").unwrap();
     ///             context.stop();
@@ -65,7 +64,7 @@ impl<'a> Context<'a> {
     /// });
     ///
     /// app.get("/", |context| {
-    ///     let token = context.contexts.get("token").unwrap().as_str().unwrap();
+    ///     let token = context.contexts.get_str("token").unwrap();
     ///     println!("token is: {:?}", token);
     /// });
     /// ```
@@ -80,55 +79,4 @@ impl<'a> Context<'a> {
     pub(crate) fn finish(self) -> hyper::Response<hyper::Body> {
         self.response.raw_response()
     }
-
-    /*
-    pub fn set<K: Into<String>, V: ToContext>(&mut self, key: K, value: V) {
-        let v: Value = value.to_context();
-        self.contexts.insert(key.into(), v);
-    }
-
-    pub fn get<K: Into<String>, V: FromContext>(&self, key: K) -> Option<V> {
-        let value = self.contexts.get(&key.into());
-
-        if value.is_none() {
-            return None;
-        }
-
-        <V as FromContext>::from_context(value.unwrap())
-    }
-    */
 }
-
-/*
-pub trait ToContext {
-    fn to_context(self) -> Value;
-}
-
-pub trait FromContext: Sized {
-    fn from_context(value: &Value) -> Option<Self>;
-}
-
-impl ToContext for i32 {
-    fn to_context(self) -> Value {
-        Value::Int32(self)
-    }
-}
-
-impl FromContext for i32 {
-    fn from_context(value: &Value) -> Option<Self> {
-        value.as_i32()
-    }
-}
-
-impl ToContext for i64 {
-    fn to_context(self) -> Value {
-        Value::Int64(self)
-    }
-}
-
-impl FromContext for i64 {
-    fn from_context(value: &Value) -> Option<Self> {
-        value.as_i64()
-    }
-}
-*/

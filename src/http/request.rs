@@ -2,20 +2,14 @@ use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
 use serde_json;
-
 use futures::{Future, Stream};
-
 use hyper::{self, Uri, Method, Version, HeaderMap};
-//use hyper::header::ContentType;
-//use hyper::mime;
 use hyper::header::{CONTENT_TYPE};
 use mime::{self, Mime};
 
-use util::url;
-
+use crate::util::url;
+use crate::error::Result;
 use super::plus::server::FilePart;
-
-use error::Result;
 
 #[derive(Debug)]
 pub struct Request {

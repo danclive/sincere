@@ -25,14 +25,26 @@ pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 ///
 /// ```no_run
 /// use sincere::App;
+/// use sincere::app::run;
+/// use lazy_static::lazy_static;
 ///
-/// let mut app = App::new();
+/// lazy_static! {
+///     static ref APP: App = start();
+/// }
 ///
-/// app.get("/", |context| {
-///    context.response.from_text("Hello world!").unwrap();
-/// });
+/// fn start() -> App {
+///     let mut app = App::new();
 ///
-/// app.run("127.0.0.1:8000", 20).unwrap();
+///     app.get("/", |context| {
+///         context.response.from_text("Hello world!").unwrap();
+///     });
+///
+///     app
+/// }
+///
+/// fn main() {
+///     run("0.0.0.0:10001", 4, &APP).unwrap();    
+/// }
 /// ```
 ///
 #[derive(Default)]
@@ -77,7 +89,7 @@ impl App {
     ///
     /// let mut app = App::new();
     ///
-    /// app.add(Method::Get, "/", |context| {
+    /// app.add(Method::GET, "/", |context| {
     ///     context.response.from_text("Get method!").unwrap();
     /// });
     /// ```

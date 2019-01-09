@@ -6,8 +6,8 @@ use std::io::Write;
 
 use mime_guess;
 
-use error::Result;
-use http::plus::random_alphanumeric;
+use crate::error::Result;
+use crate::http::plus::random_alphanumeric;
 
 const BOUNDARY_LEN: usize = 32;
 
@@ -15,7 +15,7 @@ fn gen_boundary() -> String {
     random_alphanumeric(BOUNDARY_LEN)
 }
 
-use mime::{self, Mime};
+use crate::http::mime::{self, Mime};
 
 /// Create a structure to process the multipart/form-data data format for
 /// the client to initiate the request.
@@ -117,7 +117,7 @@ impl <'a> Multipart<'a> {
     ///
     /// let mut multipart = client::Multipart::new();
     ///
-    /// multipart.add_stream("ddd", reader, Some("hello.rs"), Some(sincere::http::plus::mime::APPLICATION_JSON));
+    /// multipart.add_stream("ddd", reader, Some("hello.rs"), Some(sincere::http::mime::APPLICATION_JSON));
     /// ```
     #[inline]
     pub fn add_stream<V, R>(&mut self, name: V, stream: R, filename: Option<V>, mime: Option<Mime>) -> &mut Self

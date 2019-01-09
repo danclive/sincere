@@ -4,9 +4,9 @@ use std::io::{self, Read, Write};
 
 use mime;
 
-use http::request::Request;
-use error::Result;
-use http::plus::random_alphanumeric;
+use crate::error::Result;
+use crate::http::request::Request;
+use crate::http::plus::random_alphanumeric;
 
 use self::multipart::Multipart;
 
