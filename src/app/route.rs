@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 
 use hyper::Method;
+use regex::Regex;
 
 use super::Handle;
 use super::context::Context;
@@ -12,7 +13,7 @@ pub struct Route {
     pattern: String,
     method: Method,
     handle: Box<Handle>,
-    compilied_pattern: String,
+    pub(crate) regex: Option<Regex>,
     paths: HashMap<String, usize>,
     before: Vec<Middleware>,
     after: Vec<Middleware>,
@@ -21,16 +22,16 @@ pub struct Route {
 impl Route {
     pub fn new(method: Method, pattern: String, handle: Box<Handle>) -> Route {
         let mut route = Route {
-            pattern: pattern.clone(),
+            pattern: pattern,
             method: method,
             handle: handle,
-            compilied_pattern: String::default(),
+            regex: None,
             paths: HashMap::new(),
             before: Vec::new(),
             after: Vec::new(),
         };
 
-        route.re_connfigure(pattern);
+        route.re_connfigure();
 
         route
     }
@@ -41,10 +42,6 @@ impl Route {
 
     pub fn method(&self) -> &Method {
         &self.method
-    }
-
-    pub fn compilied_pattern(&self) -> String {
-        self.compilied_pattern.clone()
     }
 
     pub fn path(&self) -> HashMap<String, usize> {
@@ -68,24 +65,31 @@ impl Route {
     middleware!(before);
     middleware!(after);
 
-    fn re_connfigure(&mut self, pattern: String) {
-        
-        let prce_pattern;
+    fn re_connfigure(&mut self) {
+        if self.pattern.contains("{") {
+            let (prce_pattern, route_paths) = extract_named_params(&self.pattern);
 
-        if pattern.contains("{") {
-            let (route, route_paths) = extract_named_params(&pattern).unwrap();
             self.paths = route_paths;
 
-            prce_pattern = route;
-        } else {
-            prce_pattern = pattern;
-        }
+            let compilied_pattern = compile_pattern(prce_pattern);
 
-        self.compilied_pattern = compile_pattern(prce_pattern);
+            if compilied_pattern.contains("^") {
+                match Regex::new(&compilied_pattern) {
+                    Ok(regex) => {
+                        self.regex = Some(regex);
+                    }
+                    Err(err) => {
+                        panic!("Can't complie route path: {:?}, err: {:?}", self.pattern, err);
+                    }
+                }
+            } else {
+                panic!("Can't complie route path: {:?}", self.pattern);
+            }
+        }
     }
 }
 
-fn extract_named_params(pattern: &str) -> Result<(String, HashMap<String, usize>), ()> {
+fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
     
     let mut parenthese_count = 0;
     let mut bracket_count = 0;
@@ -99,7 +103,7 @@ fn extract_named_params(pattern: &str) -> Result<(String, HashMap<String, usize>
     let mut variable;
     let mut regexp;
     let mut item;
-    let mut route = "".to_string();
+    let mut route = String::new();
 
     let mut not_valid = false;
 
@@ -135,16 +139,18 @@ fn extract_named_params(pattern: &str) -> Result<(String, HashMap<String, usize>
                                     break;
                                 }
 
-                                if cursor_var == 0 && !( (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+                                if cursor_var == 0 && !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
                                     not_valid = true;
                                     break;
                                 }
 
                                 if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == ':' {
                                     if ch == ':' {
-                                        let (first, last) = item.split_at(cursor_var);
-                                        variable = first;
-                                        regexp = &last[1..];
+                                        // let (first, last) = item.split_at(cursor_var);
+                                        // variable = first;
+                                        // regexp = &last[1..];
+                                        variable = &item[..cursor_var];
+                                        regexp = &item[cursor_var + 1..];
                                         break;
                                     }
                                 } else {
@@ -196,7 +202,6 @@ fn extract_named_params(pattern: &str) -> Result<(String, HashMap<String, usize>
                             continue;
                         }
                     }
-
                 }
             }
         }
@@ -227,14 +232,14 @@ fn extract_named_params(pattern: &str) -> Result<(String, HashMap<String, usize>
         }
     }
 
-    Ok((route, matches))
+    (route, matches)
 }
 
 fn compile_pattern(pattern: String) -> String {
     
-    let mut tmp = String::default();
-    
     if pattern.contains("(") || pattern.contains("["){
+        let mut tmp = String::new();
+
         tmp.push('^');
         tmp += &pattern;
         tmp.push('$');
@@ -243,4 +248,16 @@ fn compile_pattern(pattern: String) -> String {
     }
 
     pattern
+}
+
+#[test]
+fn compile() {
+    let pattern = "{year:[0-9]{4}}/{title:[a-zA-Z\\-]+}";
+
+    let (route, route_paths) = extract_named_params(pattern);
+    assert_eq!(route, "([0-9]{4})/([a-zA-Z\\-]+)");
+    let mut map: HashMap<String, usize> = HashMap::new();
+    map.insert("title".to_string(), 2);
+    map.insert("year".to_string(), 1);
+    assert_eq!(route_paths, map);
 }

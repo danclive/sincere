@@ -1,6 +1,4 @@
 //! App container.
-use regex::Regex;
-
 use hyper::{Request, Response, Body};
 use hyper::Method;
 
@@ -8,7 +6,6 @@ pub use self::route::Route;
 pub use self::group::Group;
 use self::middleware::Middleware;
 use self::context::Context;
-//use self::run::AppHandle;
 pub use self::run::run;
 
 #[macro_use]
@@ -96,14 +93,7 @@ impl App {
     pub fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
-        let route = Route::new(
-            method,
-            pattern.into(), 
-            Box::new(handle),
-        );
-
-        self.groups.get_mut(0).unwrap().routes.push(route);
-        self.groups.get_mut(0).unwrap().routes.last_mut().unwrap()
+        self.groups.get_mut(0).unwrap().add(method, pattern, handle)
     }
 
     route!(
@@ -290,14 +280,15 @@ impl App {
     ///
     /// });
     /// ```
-    pub fn mount<F>(&mut self, prefix: &str, func: F)
+    pub fn mount<F>(&mut self, prefix: &str, func: F) -> &mut App
         where F: Fn(&mut Group)
     {
         let mut group = Group::new(prefix); 
 
         func(&mut group);
         
-        self.groups.push(group)
+        self.groups.push(group);
+        self
     }
 
     /// Mount router group to app.
@@ -322,8 +313,9 @@ impl App {
     ///
     /// app.mount_group(group);
     ///
-    pub fn mount_group(&mut self, group: Group) {
-        self.groups.push(group)
+    pub fn mount_group(&mut self, group: Group) -> &mut App {
+        self.groups.push(group);
+        self
     }
 
     middleware!(
@@ -415,10 +407,11 @@ impl App {
     ///
     /// });
     /// ```
-    pub fn middleware<F>(&mut self, func: F)
+    pub fn middleware<F>(&mut self, func: F) -> &mut App
         where F: Fn(&mut App)
     {
-        func(self)
+        func(self);
+        self
     }
 
     /// Add `not-found handle` to app.
@@ -453,73 +446,69 @@ impl App {
         }
 
         if context.next() {
+            let path = {
+                let path = context.request.uri().path();
+                if path != "/" {
+                    path.trim_end_matches('/').to_owned()
+                } else {
+                    path.to_owned()
+                }
+            };
 
             'outer: for group in self.groups.iter() {
 
-                for route in group.routes.iter() {
+                if let Some(routes) = group.routes.get(context.request.method()) {
 
-                    if route.method() != context.request.method() {
-                        continue;
-                    }
+                    for route in routes.iter() {
+                        if let Some(ref regex) = route.regex {
+                            let caps = regex.captures(&path);
 
-                    let path = {
-                        let path = context.request.uri().path();
-                        if path != "/" {
-                            path.trim_right_matches('/').to_owned()
+                            if let Some(caps) = caps {
+                                route_found = true;
+
+                                let matches = route.path();
+
+                                for (key, value) in matches.iter() {
+                                    context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                                }
+                            }
                         } else {
-                            path.to_owned()
-                        }
-                    };
+                            let pattern = {
+                                let pattern = route.pattern();
+                                if pattern != "/" {
+                                    pattern.trim_end_matches('/').to_owned()
+                                } else {
+                                    pattern.to_owned()
+                                }
+                            };
 
-                    let pattern = {
-                        let pattern = route.compilied_pattern();
-                        if pattern != "/" {
-                            pattern.trim_right_matches('/').to_owned()
-                        } else {
-                            pattern
-                        }
-                    };
-
-                    if pattern.contains("^") {
-                        let re = Regex::new(&pattern).unwrap();
-                        let caps = re.captures(&path);
-
-                        if let Some(caps) = caps {
-                            route_found = true;
-
-                            let matches = route.path();
-
-                            for (key, value) in matches.iter() {
-                                context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                            if pattern == path {
+                                route_found = true;
                             }
                         }
-                    } else {
-                        if pattern == path {
-                            route_found = true;
+
+                        if route_found {
+
+                            for before in self.before.iter() {
+                                before.execute(&mut context);
+                            }
+
+                            for before in group.before.iter() {
+                                before.execute(&mut context);
+                            }
+
+                            route.execute(&mut context);
+
+                            for after in group.after.iter() {
+                                after.execute(&mut context);
+                            }
+
+                            for after in self.after.iter() {
+                                after.execute(&mut context);
+                            }
+
+                            break 'outer;
                         }
-                    }
-
-                    if route_found {
-
-                        for before in self.before.iter() {
-                            before.execute(&mut context);
-                        }
-
-                        for before in group.before.iter() {
-                            before.execute(&mut context);
-                        }
-
-                        route.execute(&mut context);
-
-                        for after in group.after.iter() {
-                            after.execute(&mut context);
-                        }
-
-                        for after in self.after.iter() {
-                            after.execute(&mut context);
-                        }
-
-                        break 'outer;
                     }
                 }
             }

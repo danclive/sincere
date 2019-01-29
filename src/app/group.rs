@@ -1,4 +1,6 @@
 /// Route group
+use std::collections::HashMap;
+
 use super::route::Route;
 use super::context::Context;
 use super::middleware::Middleware;
@@ -48,7 +50,7 @@ use crate::http::Method;
 /// });
 /// ```
 pub struct Group {
-    pub routes: Vec<Route>,
+    pub routes: HashMap<Method, Vec<Route>>,
     prefix: String,
     pub before: Vec<Middleware>,
     pub after: Vec<Middleware>,
@@ -67,7 +69,7 @@ impl Group {
     ///
     pub fn new(prefix: &str) -> Group {
         Group {
-            routes: Vec::new(),
+            routes: HashMap::new(),
             prefix: prefix.to_owned(),
             before: Vec::new(),
             after: Vec::new(),
@@ -92,13 +94,14 @@ impl Group {
         where H: Fn(&mut Context) + Send + Sync + 'static
     {
         let route = Route::new(
-            method, 
+            method.clone(),
             self.prefix.clone() + pattern,
             Box::new(handle),
         );
 
-        self.routes.push(route);
-        self.routes.last_mut().unwrap()
+        let routes = self.routes.entry(method).or_insert(Vec::new());
+        routes.push(route);
+        routes.last_mut().unwrap()
     }
 
     route!(
