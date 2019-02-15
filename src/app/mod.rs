@@ -6,7 +6,7 @@ pub use self::route::Route;
 pub use self::group::Group;
 use self::middleware::Middleware;
 use self::context::Context;
-pub use self::run::run;
+use crate::error::Result;
 
 #[macro_use]
 mod macros;
@@ -14,7 +14,6 @@ mod route;
 mod group;
 pub mod middleware;
 pub mod context;
-mod run;
 
 pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 
@@ -22,25 +21,15 @@ pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 ///
 /// ```no_run
 /// use sincere::App;
-/// use sincere::app::run;
-/// use lazy_static::lazy_static;
 ///
-/// lazy_static! {
-///     static ref APP: App = start();
-/// }
-///
-/// fn start() -> App {
+/// fn main() {
 ///     let mut app = App::new();
 ///
 ///     app.get("/", |context| {
 ///         context.response.from_text("Hello world!").unwrap();
 ///     });
 ///
-///     app
-/// }
-///
-/// fn main() {
-///     run("0.0.0.0:10001", 4, &APP).unwrap();    
+///     app.run("0.0.0.0:10001", 4).unwrap();
 /// }
 /// ```
 ///
@@ -434,7 +423,8 @@ impl App {
             inner: Box::new(handle),
         });
     }
-        /// handle
+
+    /// handle
     fn handle(&self, request: Request<Body>) -> Response<Body> {
 
         let mut context = Context::new(self, request);
@@ -528,4 +518,84 @@ impl App {
 
         context.finish()
     }
+
+    /// Run app.
+    ///
+    /// ```no_run
+    /// use sincere::App;
+    ///
+    /// fn main() {
+    ///     let mut app = App::new();
+    ///
+    ///     app.get("/", |context| {
+    ///         context.response.from_text("Hello world!").unwrap();
+    ///     });
+    ///
+    ///     app.run("0.0.0.0:10001", 4).unwrap();
+    /// }
+    /// ```
+    ///
+    pub fn run(&self, addr: &str, thread_size: usize) -> Result<()> {
+        use queen_log::color::Print;
+        use futures::future::Future;
+        use futures_cpupool::CpuPool;
+        use hyper::{self, Response, Body, Server};
+        use hyper::service::service_fn;
+
+        type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
+
+        let app = unsafe {
+            let a: *const App = &*self;
+            &*a
+        };
+
+        let sincere_logo = Print::green(
+        r"
+         __.._..  . __ .___.__ .___
+        (__  | |\ |/  `[__ [__)[__
+        .__)_|_| \|\__.[___|  \[___
+        "
+        );
+
+        println!("{}", sincere_logo);
+        println!(
+            "    {}{} {} {} {}",
+            Print::green("Server running at http://"),
+            Print::green(addr),
+            Print::green("on"),
+            Print::green(thread_size),
+            Print::green("threads.")
+        );
+
+        let addr = addr.parse().expect("Address is not valid");
+        let thread_pool = CpuPool::new(thread_size);
+
+        let new_svc = move || {
+
+            let pool = thread_pool.clone();
+
+            service_fn(move |req| -> BoxFut {
+                let rep = pool.spawn_fn(move || {
+                    let response = app.handle(req);
+                    Ok(response)
+                });
+
+                Box::new(rep)
+            })
+         };
+
+        let server = Server::bind(&addr).serve(new_svc).map_err(|e| eprintln!("server error: {}", e));
+        hyper::rt::run(server);
+
+        Ok(())
+    }
 }
+
+// pub fn leak<T>(v: T) -> &'static T {
+//     unsafe {
+//         let b = Box::new(v);
+//         let p: *const T = &*b;
+//         std::mem::forget(b); // leak our reference, so that `b` is never freed
+//         &*p
+//     }
+// }
