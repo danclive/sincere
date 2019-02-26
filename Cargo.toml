@@ -1,6 +1,6 @@
 [package]
 name          = "sincere"
-version       = "0.6.2"
+version       = "0.6.3"
 license       = "MIT"
 authors       = ["mitum <dangcheng@hotmail.com>"]
 description   = "web framework"
@@ -26,7 +26,7 @@ url = "1.7"
 httparse = "1.3"
 num_cpus = "1.9"
 libc = "0.2"
-buf_redux = "0.8"
+buf_redux = "0.6"
 twoway = "0.2"
 tempdir = "0.3"
 rand = "0.6.5"

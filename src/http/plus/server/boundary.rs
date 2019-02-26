@@ -6,12 +6,9 @@ use std::io;
 use std::io::prelude::*;
 
 use buf_redux::BufReader;
-use buf_redux::policy::MinBuffered;
 use twoway;
 
 use self::State::*;
-
-pub const MIN_BUF_SIZE: usize = 1024;
 
 #[derive(Debug, PartialEq, Eq)]
 enum State {
@@ -23,7 +20,7 @@ enum State {
 /// A struct implementing `Read` and `BufRead` that will yield bytes until it sees a given sequence.
 #[derive(Debug)]
 pub struct BoundaryReader<R> {
-    source: BufReader<R, MinBuffered>,
+    source: BufReader<R>,
     boundary: Vec<u8>,
     search_idx: usize,
     state: State,
@@ -39,29 +36,22 @@ impl<R> BoundaryReader<R> where R: Read {
         boundary.push(b'-');
         boundary.extend(boundary_temp);
 
-        let source = BufReader::new(reader).set_policy(MinBuffered(MIN_BUF_SIZE));
-
         BoundaryReader {
-            source,
-            boundary,
+            source: BufReader::new(reader),
+            boundary: boundary,
             search_idx: 0,
             state: Searching,
         }
     }
 
     fn read_to_boundary(&mut self) -> io::Result<&[u8]> {
-        // // Make sure there's enough bytes in the buffer to positively identify the boundary.
-        // let min_len = self.search_idx + (self.boundary.len() * 2);
+        // Make sure there's enough bytes in the buffer to positively identify the boundary.
+        let min_len = self.search_idx + (self.boundary.len() * 2);
 
-        // let buf = fill_buf_min(&mut self.source, min_len)?;
+        let buf = fill_buf_min(&mut self.source, min_len)?;
 
-        // if buf.is_empty() {
-        //     println!("fill_buf_min returned zero-sized buf");
-        // }
-        let buf = self.source.fill_buf()?;
-
-        if self.state == BoundaryRead || self.state == AtEnd {
-            return Ok(&buf[..self.search_idx])
+        if buf.is_empty() {
+            println!("fill_buf_min returned zero-sized buf");
         }
 
         if self.state == Searching && self.search_idx < buf.len() {
@@ -79,24 +69,21 @@ impl<R> BoundaryReader<R> where R: Read {
             }
         }
 
-        if self.search_idx >= 2 && !buf[self.search_idx..].starts_with(b"\r\n") {
-            let two_bytes_before = &buf[self.search_idx - 2 .. self.search_idx];
+        // don't modify search_idx so it always points to the start of the boundary
+        let mut buf_len = self.search_idx;
 
-            if two_bytes_before == *b"\r\n" {
-                self.search_idx -= 2;
+        // back up the cursor to before the boundary's preceding CRLF
+        if self.state != Searching && buf_len >= 2 {
+            let two_bytes_before = &buf[buf_len - 2 .. buf_len];
+
+            if two_bytes_before == &*b"\r\n" {
+                buf_len -= 2;
             }
         }
 
-        let ret_buf = &buf[..self.search_idx];
+        let ret_buf = &buf[..buf_len];
 
         Ok(ret_buf)
-    }
-
-    pub fn set_min_buf_size(&mut self, min_buf_size: usize) {
-        // ensure the minimum buf size is at least enough to find a boundary with some extra
-        let min_buf_size = cmp::max(self.boundary.len() * 2, min_buf_size);
-
-        self.source.policy_mut().0 = min_buf_size;
     }
 
     #[doc(hidden)]
@@ -108,38 +95,15 @@ impl<R> BoundaryReader<R> where R: Read {
         while self.state == Searching {
             let buf_len = self.read_to_boundary()?.len();
 
-            if buf_len == 0 && self.state == Searching {
-                return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
-                                          "unexpected end of request body"));
-            }
-
             self.consume(buf_len);
         }
 
         let consume_amt = {
-            let buf = self.source.fill_buf()?;
+            let min_len = self.boundary.len() + 4;
 
-            // if the boundary is found we should have at least this much in-buffer
-            let mut consume_amt = self.search_idx + self.boundary.len();
+            let buf = fill_buf_min(&mut self.source, min_len)?;
 
-            // we don't care about data before the cursor
-            let bnd_segment = &buf[self.search_idx..];
-
-            if bnd_segment.starts_with(b"\r\n") {
-                // preceding CRLF needs to be consumed as well
-                consume_amt += 2;
-
-                // assert that we've found the boundary after the CRLF
-                debug_assert_eq!(*self.boundary, bnd_segment[2 .. self.boundary.len() + 2]);
-            } else {
-                // assert that we've found the boundary
-                debug_assert_eq!(*self.boundary, bnd_segment[..self.boundary.len()]);
-            }
-
-            // include the trailing CRLF or --
-            consume_amt += 2;
-
-            if buf.len() < consume_amt {
+            if buf.len() < min_len {
                 return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
                                           "not enough bytes to verify boundary"));
             }
@@ -147,16 +111,14 @@ impl<R> BoundaryReader<R> where R: Read {
             // we have enough bytes to verify
             self.state = Searching;
 
-            let last_two = &buf[consume_amt - 2 .. consume_amt];
+            let mut consume_amt = self.search_idx + self.boundary.len();
+
+            let last_two = &buf[consume_amt .. consume_amt + 2];
 
             match last_two {
-                b"\r\n" => self.state = Searching,
-                b"--" => self.state = AtEnd,
-                _ => return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("unexpected bytes following multipart boundary: {:X} {:X}",
-                            last_two[0], last_two[1])
-                )),
+                b"\r\n" => consume_amt += 2,
+                b"--" => { consume_amt += 2; self.state = AtEnd },
+                _ => ()
             }
 
             consume_amt
@@ -165,7 +127,7 @@ impl<R> BoundaryReader<R> where R: Read {
         self.source.consume(consume_amt);
         self.search_idx = 0;
 
-        Ok(self.state != AtEnd)
+        Ok(self.state == AtEnd)
     }
 }
 
@@ -213,4 +175,15 @@ impl<R> BufRead for BoundaryReader<R> where R: Read {
         self.source.consume(true_amt);
         self.search_idx -= true_amt;
     }
+}
+
+fn fill_buf_min<R: Read>(buf: &mut BufReader<R>, min: usize) -> io::Result<&[u8]> {
+    let mut attempts = 0;
+
+    while buf.available() < min && attempts < min {
+        if buf.read_into_buf()? == 0 { break; };
+        attempts += 1;
+    }
+
+    Ok(buf.get_buf())
 }
