@@ -1,19 +1,11 @@
 use std::path::PathBuf;
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::Write;
 
 use mime;
 
 use crate::error::Result;
 use crate::http::request::Request;
-use crate::http::plus::random_alphanumeric;
-
-use self::multipart::Multipart;
-
-mod multipart;
-mod boundary;
-mod field;
-mod save;
 
 impl Request {
     pub(crate) fn parse_formdata(&mut self) -> Option<FormData> {
@@ -29,9 +21,7 @@ impl Request {
                 return None
             };
 
-            let reader = io::Cursor::new(self.body());
-
-            return Some(FormData::with_body(reader, boundary));
+            return FormData::parse(self.body(), boundary)
         }
 
         None
@@ -57,7 +47,7 @@ impl FormData {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FilePart {
     pub name: String,
-    pub filename: Option<String>,
+    pub filename: String,
     pub content_type: mime::Mime,
     pub data: Vec<u8>,
 }
@@ -66,13 +56,7 @@ impl FilePart {
     pub fn save_file<P: Into<PathBuf>>(&mut self, path: P) -> Result<PathBuf> {
         let mut path_buf = path.into();
 
-        // Temp Path ??
-        if let Some(ref filename) = self.filename {
-            path_buf.push(filename);
-        } else {
-            let filename = random_alphanumeric(16);
-            path_buf.push(filename);
-        }
+        path_buf.push(self.filename.clone());
 
         let path_buf2 = path_buf.clone();
 
@@ -103,34 +87,138 @@ impl FormData {
         }
     }
 
-    pub fn with_body<R: Read, B: Into<String>>(body: R, boundary: B) -> FormData {
-        let mut multipart = Multipart::with_body(body, boundary);
+    pub fn parse(body: &[u8], boundary: &str) -> Option<FormData> {
+        let boundary = "--".to_owned() + boundary;
 
         let mut form_data = FormData::new();
 
-        while let Ok(Some(mut entry)) = multipart.read_entry() {
-            if entry.is_text() {
-                let mut save_build = entry.data.save();
-                let mut buf: Vec<u8> = Vec::new();
-                save_build.write_to(&mut buf);
+        {
+            if !has_boundary(body, &boundary) {
+                return None
+            }
 
-                form_data.fields.push((entry.headers.name.to_string(), String::from_utf8_lossy(&buf).into_owned()));
-            } else {
-                let mut save_build = entry.data.save();
-                let mut buf: Vec<u8> = Vec::new();
-                save_build.write_to(&mut buf);
+            if body.len() <= boundary.len() + 2 {
+                return None
+            }
 
-                let file_part = FilePart {
-                    name: entry.headers.name.to_string(),
-                    filename: entry.headers.filename,
-                    content_type: entry.headers.content_type.unwrap(),
-                    data: buf
-                };
+            let mut part: Vec<(usize, usize)> = Vec::new(); 
 
-                form_data.files.push(file_part);
+            let mut cursor = boundary.len() + 2;
+
+            loop {
+                match twoway::find_bytes(&body[cursor..], boundary.as_bytes()) {
+                    Some(index) => {
+                        if index == 0 {
+                            break;
+                        }
+
+                        if &body[cursor + index - 2..cursor + index] != b"\r\n" {
+                            return None
+                        }
+
+                        part.push((cursor, cursor + index - 2));
+
+                        cursor = cursor + boundary.len() + 2 + index;
+
+                        if cursor > body.len() {
+                            return None;
+                        }
+                    },
+                    None => {
+                        if cursor == body.len() && &body[cursor - 2..cursor] == b"--" {
+                            break;
+                        }
+
+                        if cursor == body.len() - 2 && &body[cursor - 2..cursor] == b"--" {
+                            break;
+                        }
+
+                        return None;
+                    }
+                }
+            }
+
+            for (start, end) in part {
+                let mut headers = [httparse::EMPTY_HEADER; 4];
+                match httparse::parse_headers(&body[start..end], &mut headers) {
+                    Ok(httparse::Status::Complete((index, raw_headers))) => {
+                        if let Some(value) = get_value_from_header(raw_headers, "Content-Disposition") {
+                            let ss: Vec<&str> = value.split(";").collect();
+
+                            let mut name = "";
+                            let mut filename = None;
+
+                            for s in ss {
+                                let s = s.trim();
+                                if s.starts_with("name") {
+                                    name = &s[6..s.len()-1];
+                                } else if s.starts_with("filename") {
+                                    filename = Some(&s[10..s.len()-1]);
+                                }
+                            }
+
+                            // is file
+                            if let Some(filename) = filename {
+                                let content_type = {
+                                    if let Some(value) = get_value_from_header(raw_headers, "Content-Type") {
+                                        value.parse().unwrap_or(mime::APPLICATION_OCTET_STREAM)
+                                    } else {
+                                        mime::APPLICATION_OCTET_STREAM
+                                    }
+                                };
+
+                                let file_part = FilePart {
+                                    name: name.to_string(),
+                                    filename: filename.to_owned(),
+                                    content_type: content_type,
+                                    data: body[start + index..end].to_vec()
+                                };
+
+                                form_data.files.push(file_part);
+
+
+                            } else {
+                                form_data.fields.push(
+                                    (name.to_string(), String::from_utf8_lossy(&body[start + index..end]).into_owned())
+                                );
+                            }
+                        } else {
+                            return None
+                        }
+                    },
+                    Ok(httparse::Status::Partial) => {
+                        return None
+                    },
+                    Err(_) => {
+                        return None
+                    }
+                }
             }
         }
 
-        form_data
+        Some(form_data)
     }
+}
+
+fn has_boundary(body: &[u8], boundary: &str) -> bool {
+    match twoway::find_bytes(body, boundary.as_bytes()) {
+        Some(index) => {
+            if index == 0 {
+                return true;
+            } else {
+                return false;
+            }
+        },
+        None => return false
+    }
+}
+
+fn get_value_from_header<'a>(headers: &'a [httparse::Header], key: &str) -> Option<String> {
+    for header in headers {
+        if header.name == key {
+            return Some(String::from_utf8_lossy(header.value).to_string())
+        }
+    }
+
+    None
 }
