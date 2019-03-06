@@ -46,8 +46,6 @@ extern crate url;
 extern crate httparse;
 extern crate num_cpus;
 extern crate libc;
-
-extern crate buf_redux;
 extern crate twoway;
 extern crate tempdir;
 extern crate rand;
