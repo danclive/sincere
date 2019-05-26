@@ -1,4 +1,4 @@
-//! Sincere is a micro web framework for Rust(stable) based on 
+//! Sincere is a micro web framework for Rust(stable) based on
 //! [hyper](https://github.com/hyperium/hyper) and multithreadind. Style like [koa](https://github.com/koajs/koa).
 //! The same, which aims to be a smaller, more expressive, and more robust foundation for
 //! web applications and APIs. Sincere does not bundle any middleware within core,
@@ -36,23 +36,22 @@
 //!
 //!
 
-
 extern crate chrono;
 extern crate regex;
 #[macro_use]
 extern crate serde;
-extern crate serde_json;
-extern crate url;
 extern crate httparse;
-extern crate num_cpus;
 extern crate libc;
-extern crate twoway;
-extern crate tempdir;
+extern crate num_cpus;
 extern crate rand;
+extern crate serde_json;
+extern crate tempdir;
+extern crate twoway;
+extern crate url;
 
-extern crate hyper;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate hyper;
 
 #[allow(unused_imports)]
 #[macro_use]
@@ -61,11 +60,11 @@ extern crate mime;
 extern crate mime_guess;
 pub extern crate nson;
 
-pub mod http;
 pub mod app;
+pub mod error;
+pub mod http;
 pub mod text;
 pub mod util;
-pub mod error;
 
 pub use self::app::App;
 pub use self::error::Error;
@@ -75,7 +74,7 @@ pub use queen_log::*;
 
 pub mod log {
     pub use queen_log::color;
+    pub use queen_log::{init, Level, Log, Metadata, Record};
+    pub use queen_log::{DefaultLogger, Logger};
     pub use queen_log::{LOG, MAX_LEVEL};
-    pub use queen_log::{Logger, DefaultLogger};
-    pub use queen_log::{Log, init, Level, Record, Metadata};
 }

@@ -1,14 +1,14 @@
-use std::result;
-use std::io;
-use std::fmt;
 use std::error;
-use std::sync::mpsc::TryRecvError;
-use std::string::FromUtf8Error;
+use std::fmt;
+use std::io;
 use std::num::ParseIntError;
+use std::result;
+use std::string::FromUtf8Error;
+use std::sync::mpsc::TryRecvError;
 
-use serde_json;
 use httparse;
 use hyper;
+use serde_json;
 use url;
 
 pub type Result<T> = result::Result<T, Error>;
@@ -113,4 +113,3 @@ impl error::Error for Error {
         }
     }
 }
-

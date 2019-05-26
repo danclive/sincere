@@ -6,11 +6,13 @@ pub trait BufReadExt: BufRead {
     }
 }
 
-impl<T: BufRead> BufReadExt for T { }
+impl<T: BufRead> BufReadExt for T {}
 
-fn stream_until_token<R: BufRead + ?Sized, W: Write>(stream: &mut R, token: &[u8], out: &mut W)
-                                                     -> Result<(usize, bool)>
-{
+fn stream_until_token<R: BufRead + ?Sized, W: Write>(
+    stream: &mut R,
+    token: &[u8],
+    out: &mut W,
+) -> Result<(usize, bool)> {
     let mut read = 0;
     // Represents the sizes of possible token prefixes found at the end of the last buffer, usually
     // empty. If not empty, the beginning of this buffer is checked for the matching suffixes to
@@ -20,8 +22,7 @@ fn stream_until_token<R: BufRead + ?Sized, W: Write>(stream: &mut R, token: &[u8
     let mut found: bool;
     let mut used: usize;
 
-    'stream:
-    loop {
+    'stream: loop {
         found = false;
         used = 0;
 
@@ -29,15 +30,14 @@ fn stream_until_token<R: BufRead + ?Sized, W: Write>(stream: &mut R, token: &[u8
         // The reader is encouraged to try their hand at coding this better, noting that buffer must
         // drop out of scope before stream can be used again.
         let mut do_once = true;
-        'buffer:
-        while do_once {
+        'buffer: while do_once {
             do_once = false;
 
             // Fill the buffer (without consuming)
             let buffer = match stream.fill_buf() {
                 Ok(n) => n,
                 Err(ref err) if err.kind() == ErrorKind::Interrupted => continue,
-                Err(err) => return Err(err)
+                Err(err) => return Err(err),
             };
             if buffer.len() == 0 {
                 break 'stream;
@@ -77,7 +77,7 @@ fn stream_until_token<R: BufRead + ?Sized, W: Write>(stream: &mut R, token: &[u8
                             out.write_all(&token[..prefix_len])?;
                         } else {
                             // ...from this prefix length to the next
-                            let next_prefix_len = drain[index+1];
+                            let next_prefix_len = drain[index + 1];
                             out.write_all(&token[..prefix_len - next_prefix_len])?;
                         }
                     }
@@ -111,7 +111,8 @@ fn stream_until_token<R: BufRead + ?Sized, W: Write>(stream: &mut R, token: &[u8
             } else {
                 0
             };
-            for prefix in (1..window+1).rev()
+            for prefix in (1..window + 1)
+                .rev()
                 .filter(|&w| token[..w] == buffer[buffer.len() - w..])
             {
                 if reserve == 0 {
@@ -120,7 +121,7 @@ fn stream_until_token<R: BufRead + ?Sized, W: Write>(stream: &mut R, token: &[u8
                 prefix_lengths.push(prefix)
             }
 
-            out.write_all(&buffer[..buffer.len()-reserve])?;
+            out.write_all(&buffer[..buffer.len() - reserve])?;
             used = buffer.len();
         }
 
@@ -145,33 +146,54 @@ mod tests {
     fn stream_until_token() {
         let mut buf = Cursor::new(&b"123456"[..]);
         let mut result: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"78", &mut result).unwrap(), (6, false));
+        assert_eq!(
+            buf.stream_until_token(b"78", &mut result).unwrap(),
+            (6, false)
+        );
         assert_eq!(result, b"123456");
 
         let mut buf = Cursor::new(&b"12345678"[..]);
         let mut result: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"34", &mut result).unwrap(), (2, true));
+        assert_eq!(
+            buf.stream_until_token(b"34", &mut result).unwrap(),
+            (2, true)
+        );
         assert_eq!(result, b"12");
 
         result.truncate(0);
-        assert_eq!(buf.stream_until_token(b"78", &mut result).unwrap(), (2, true));
+        assert_eq!(
+            buf.stream_until_token(b"78", &mut result).unwrap(),
+            (2, true)
+        );
         assert_eq!(result, b"56");
 
         let mut buf = Cursor::new(&b"bananas for nana"[..]);
         let mut result: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"nan", &mut result).unwrap(), (2, true));
+        assert_eq!(
+            buf.stream_until_token(b"nan", &mut result).unwrap(),
+            (2, true)
+        );
         assert_eq!(result, b"ba");
 
         result.truncate(0);
-        assert_eq!(buf.stream_until_token(b"nan", &mut result).unwrap(), (7, true));
+        assert_eq!(
+            buf.stream_until_token(b"nan", &mut result).unwrap(),
+            (7, true)
+        );
         assert_eq!(result, b"as for ");
 
         result.truncate(0);
-        assert_eq!(buf.stream_until_token(b"nan", &mut result).unwrap(), (1, false));
+        assert_eq!(
+            buf.stream_until_token(b"nan", &mut result).unwrap(),
+            (1, false)
+        );
         assert_eq!(result, b"a");
 
         result.truncate(0);
-        assert_eq!(buf.stream_until_token(b"nan", &mut result).unwrap(), (0, false));
+        assert_eq!(
+            buf.stream_until_token(b"nan", &mut result).unwrap(),
+            (0, false)
+        );
         assert_eq!(result, b"");
     }
 
@@ -180,22 +202,34 @@ mod tests {
         let cursor = Cursor::new(&b"12345TOKEN345678"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut result: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"TOKEN", &mut result).unwrap(), (5, true));
+        assert_eq!(
+            buf.stream_until_token(b"TOKEN", &mut result).unwrap(),
+            (5, true)
+        );
         assert_eq!(result, b"12345");
 
         result.truncate(0);
-        assert_eq!(buf.stream_until_token(b"TOKEN", &mut result).unwrap(), (6, false));
+        assert_eq!(
+            buf.stream_until_token(b"TOKEN", &mut result).unwrap(),
+            (6, false)
+        );
         assert_eq!(result, b"345678");
 
         result.truncate(0);
-        assert_eq!(buf.stream_until_token(b"TOKEN", &mut result).unwrap(), (0, false));
+        assert_eq!(
+            buf.stream_until_token(b"TOKEN", &mut result).unwrap(),
+            (0, false)
+        );
         assert_eq!(result, b"");
 
         //                          <------><------><------>
         let cursor = Cursor::new(&b"12345TOKE23456781TOKEN78"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut result: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"TOKEN", &mut result).unwrap(), (17, true));
+        assert_eq!(
+            buf.stream_until_token(b"TOKEN", &mut result).unwrap(),
+            (17, true)
+        );
         assert_eq!(result, b"12345TOKE23456781");
     }
 
@@ -205,18 +239,30 @@ mod tests {
         let cursor = Cursor::new(&b"IAMALARGETOKEN7812345678"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut v: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(), (0, true));
+        assert_eq!(
+            buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(),
+            (0, true)
+        );
         assert_eq!(v, b"");
-        assert_eq!(buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(), (10, false));
+        assert_eq!(
+            buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(),
+            (10, false)
+        );
         assert_eq!(v, b"7812345678");
 
         let cursor = Cursor::new(&b"0IAMALARGERTOKEN12345678"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut v: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"IAMALARGERTOKEN", &mut v).unwrap(), (1, true));
+        assert_eq!(
+            buf.stream_until_token(b"IAMALARGERTOKEN", &mut v).unwrap(),
+            (1, true)
+        );
         assert_eq!(v, b"0");
         v.truncate(0);
-        assert_eq!(buf.stream_until_token(b"IAMALARGERTOKEN", &mut v).unwrap(), (8, false));
+        assert_eq!(
+            buf.stream_until_token(b"IAMALARGERTOKEN", &mut v).unwrap(),
+            (8, false)
+        );
         assert_eq!(v, b"12345678");
     }
 
@@ -226,10 +272,16 @@ mod tests {
         let cursor = Cursor::new(&b"12345IAMALARGETOKEN4567"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut v: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(), (5, true));
+        assert_eq!(
+            buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(),
+            (5, true)
+        );
         assert_eq!(v, b"12345");
         v.truncate(0);
-        assert_eq!(buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(), (4, false));
+        assert_eq!(
+            buf.stream_until_token(b"IAMALARGETOKEN", &mut v).unwrap(),
+            (4, false)
+        );
         assert_eq!(v, b"4567");
     }
 
@@ -239,13 +291,19 @@ mod tests {
         let cursor = Cursor::new(&b"12barbarian4567"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut v: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"barbarian", &mut v).unwrap(), (2, true));
+        assert_eq!(
+            buf.stream_until_token(b"barbarian", &mut v).unwrap(),
+            (2, true)
+        );
         assert_eq!(v, b"12");
 
         let cursor = Cursor::new(&b"12barbarbarian7812"[..]);
         let mut buf = BufReader::with_capacity(8, cursor);
         let mut v: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"barbarian", &mut v).unwrap(), (5, true));
+        assert_eq!(
+            buf.stream_until_token(b"barbarian", &mut v).unwrap(),
+            (5, true)
+        );
         assert_eq!(v, b"12bar");
     }
 
@@ -256,7 +314,10 @@ mod tests {
         let cursor = Cursor::new(&b"A SANTA BARBARA BARBARBARIANEND"[..]);
         let mut buf = BufReader::with_capacity(4, cursor);
         let mut v: Vec<u8> = Vec::new();
-        assert_eq!(buf.stream_until_token(b"BARBARIAN", &mut v).unwrap(), (19, true));
+        assert_eq!(
+            buf.stream_until_token(b"BARBARIAN", &mut v).unwrap(),
+            (19, true)
+        );
         assert_eq!(v, b"A SANTA BARBARA BAR");
 
         /*            prefix lens:   out:
@@ -270,7 +331,10 @@ mod tests {
          */
 
         v.truncate(0);
-        assert_eq!(buf.stream_until_token(b"BARBARIAN", &mut v).unwrap(), (3, false));
+        assert_eq!(
+            buf.stream_until_token(b"BARBARIAN", &mut v).unwrap(),
+            (3, false)
+        );
         assert_eq!(v, b"END");
     }
 }

@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use std::fs;
 use std::io::Write;
+use std::path::PathBuf;
 
 use mime;
 
@@ -11,17 +11,17 @@ impl Request {
     pub(crate) fn parse_formdata(&mut self) -> Option<FormData> {
         let content_type = match self.content_type() {
             Some(c) => c.to_owned(),
-            None => return None
+            None => return None,
         };
 
         if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
             let boundary = if let Some(boundary) = content_type.get_param(mime::BOUNDARY) {
                 boundary.as_str()
             } else {
-                return None
+                return None;
             };
 
-            return FormData::parse(self.body(), boundary)
+            return FormData::parse(self.body(), boundary);
         }
 
         None
@@ -31,7 +31,7 @@ impl Request {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FormData {
     pub fields: Vec<(String, String)>,
-    pub files: Vec<FilePart>
+    pub files: Vec<FilePart>,
 }
 
 impl FormData {
@@ -83,7 +83,7 @@ impl FormData {
     pub fn new() -> FormData {
         FormData {
             fields: Vec::new(),
-            files: Vec::new()
+            files: Vec::new(),
         }
     }
 
@@ -94,14 +94,14 @@ impl FormData {
 
         {
             if !has_boundary(body, &boundary) {
-                return None
+                return None;
             }
 
             if body.len() <= boundary.len() + 2 {
-                return None
+                return None;
             }
 
-            let mut part: Vec<(usize, usize)> = Vec::new(); 
+            let mut part: Vec<(usize, usize)> = Vec::new();
 
             let mut cursor = boundary.len() + 2;
 
@@ -113,7 +113,7 @@ impl FormData {
                         }
 
                         if &body[cursor + index - 2..cursor + index] != b"\r\n" {
-                            return None
+                            return None;
                         }
 
                         part.push((cursor, cursor + index - 2));
@@ -123,7 +123,7 @@ impl FormData {
                         if cursor > body.len() {
                             return None;
                         }
-                    },
+                    }
                     None => {
                         if cursor == body.len() && &body[cursor - 2..cursor] == b"--" {
                             break;
@@ -142,7 +142,9 @@ impl FormData {
                 let mut headers = [httparse::EMPTY_HEADER; 4];
                 match httparse::parse_headers(&body[start..end], &mut headers) {
                     Ok(httparse::Status::Complete((index, raw_headers))) => {
-                        if let Some(value) = get_value_from_header(raw_headers, "Content-Disposition") {
+                        if let Some(value) =
+                            get_value_from_header(raw_headers, "Content-Disposition")
+                        {
                             let ss: Vec<&str> = value.split(";").collect();
 
                             let mut name = "";
@@ -151,16 +153,18 @@ impl FormData {
                             for s in ss {
                                 let s = s.trim();
                                 if s.starts_with("name") {
-                                    name = &s[6..s.len()-1];
+                                    name = &s[6..s.len() - 1];
                                 } else if s.starts_with("filename") {
-                                    filename = Some(&s[10..s.len()-1]);
+                                    filename = Some(&s[10..s.len() - 1]);
                                 }
                             }
 
                             // is file
                             if let Some(filename) = filename {
                                 let content_type = {
-                                    if let Some(value) = get_value_from_header(raw_headers, "Content-Type") {
+                                    if let Some(value) =
+                                        get_value_from_header(raw_headers, "Content-Type")
+                                    {
                                         value.parse().unwrap_or(mime::APPLICATION_OCTET_STREAM)
                                     } else {
                                         mime::APPLICATION_OCTET_STREAM
@@ -171,27 +175,22 @@ impl FormData {
                                     name: name.to_string(),
                                     filename: filename.to_owned(),
                                     content_type: content_type,
-                                    data: body[start + index..end].to_vec()
+                                    data: body[start + index..end].to_vec(),
                                 };
 
                                 form_data.files.push(file_part);
-
-
                             } else {
-                                form_data.fields.push(
-                                    (name.to_string(), String::from_utf8_lossy(&body[start + index..end]).into_owned())
-                                );
+                                form_data.fields.push((
+                                    name.to_string(),
+                                    String::from_utf8_lossy(&body[start + index..end]).into_owned(),
+                                ));
                             }
                         } else {
-                            return None
+                            return None;
                         }
-                    },
-                    Ok(httparse::Status::Partial) => {
-                        return None
-                    },
-                    Err(_) => {
-                        return None
                     }
+                    Ok(httparse::Status::Partial) => return None,
+                    Err(_) => return None,
                 }
             }
         }
@@ -208,15 +207,15 @@ fn has_boundary(body: &[u8], boundary: &str) -> bool {
             } else {
                 return false;
             }
-        },
-        None => return false
+        }
+        None => return false,
     }
 }
 
 fn get_value_from_header<'a>(headers: &'a [httparse::Header], key: &str) -> Option<String> {
     for header in headers {
         if header.name == key {
-            return Some(String::from_utf8_lossy(header.value).to_string())
+            return Some(String::from_utf8_lossy(header.value).to_string());
         }
     }
 

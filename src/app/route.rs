@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use hyper::Method;
 use regex::Regex;
 
-use super::Handle;
 use super::context::Context;
 use super::middleware::Middleware;
+use super::Handle;
 
 /// Route
 pub struct Route {
@@ -79,7 +79,10 @@ impl Route {
                         self.regex = Some(regex);
                     }
                     Err(err) => {
-                        panic!("Can't complie route path: {:?}, err: {:?}", self.pattern, err);
+                        panic!(
+                            "Can't complie route path: {:?}, err: {:?}",
+                            self.pattern, err
+                        );
                     }
                 }
             } else {
@@ -90,15 +93,14 @@ impl Route {
 }
 
 fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
-    
     let mut parenthese_count = 0;
     let mut bracket_count = 0;
     let mut intermediate = 0;
-    let mut marker = 0;  
+    let mut marker = 0;
     let mut number_matches = 0;
     let mut tmp;
     let mut found_pattern;
-    
+
     let mut prev_ch = '\0';
     let mut variable;
     let mut regexp;
@@ -112,7 +114,7 @@ fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
     if !pattern.is_ascii() {
         panic!("{:?}", "The ruote pattern must be an ascii");
     }
-    
+
     for (cursor, ch) in pattern.chars().enumerate() {
         if parenthese_count == 0 {
             if ch == '{' {
@@ -128,7 +130,6 @@ fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
                     bracket_count -= 1;
                     if intermediate > 0 {
                         if bracket_count == 0 {
-
                             number_matches += 1;
                             variable = "";
                             regexp = "";
@@ -139,12 +140,20 @@ fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
                                     break;
                                 }
 
-                                if cursor_var == 0 && !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+                                if cursor_var == 0
+                                    && !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
+                                {
                                     not_valid = true;
                                     break;
                                 }
 
-                                if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == ':' {
+                                if (ch >= 'a' && ch <= 'z')
+                                    || (ch >= 'A' && ch <= 'Z')
+                                    || (ch >= '0' && ch <= '9')
+                                    || ch == '-'
+                                    || ch == '_'
+                                    || ch == ':'
+                                {
                                     if ch == ':' {
                                         // let (first, last) = item.split_at(cursor_var);
                                         // variable = first;
@@ -162,7 +171,6 @@ fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
                             if !not_valid {
                                 tmp = number_matches;
                                 if !variable.is_empty() && !regexp.is_empty() {
-
                                     found_pattern = 0;
                                     for regexp_ch in regexp.chars() {
                                         if regexp_ch == '\0' {
@@ -193,7 +201,6 @@ fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
                                     route += "([^/]*)";
                                     matches.insert(item.to_string(), tmp);
                                 }
-                                
                             } else {
                                 route.push('{');
                                 route += item;
@@ -236,8 +243,7 @@ fn extract_named_params(pattern: &str) -> (String, HashMap<String, usize>) {
 }
 
 fn compile_pattern(pattern: String) -> String {
-    
-    if pattern.contains("(") || pattern.contains("["){
+    if pattern.contains("(") || pattern.contains("[") {
         let mut tmp = String::new();
 
         tmp.push('^');

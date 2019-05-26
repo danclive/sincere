@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
+use futures::{Future, Stream};
+use hyper::header::CONTENT_TYPE;
+use hyper::{self, HeaderMap, Method, Uri, Version};
+use mime::{self, Mime};
 use serde::de::DeserializeOwned;
 use serde_json;
-use futures::{Future, Stream};
-use hyper::{self, Uri, Method, Version, HeaderMap};
-use hyper::header::{CONTENT_TYPE};
-use mime::{self, Mime};
 
-use crate::util::url;
-use crate::error::Result;
 use super::plus::server::FilePart;
+use crate::error::Result;
+use crate::util::url;
 
 #[derive(Debug)]
 pub struct Request {
@@ -21,13 +21,17 @@ pub struct Request {
     querys: Vec<(String, String)>,
     posts: Vec<(String, String)>,
     files: Vec<FilePart>,
-    body: Vec<u8>
+    body: Vec<u8>,
 }
 
 impl Request {
-    pub(crate) fn from_hyper_request(hyper_request: hyper::Request<hyper::Body>) -> Request { 
+    pub(crate) fn from_hyper_request(hyper_request: hyper::Request<hyper::Body>) -> Request {
         let (parts, body) = hyper_request.into_parts();
-        let body = body.concat2().map(|b| b.to_vec() ).wait().unwrap_or_default();
+        let body = body
+            .concat2()
+            .map(|b| b.to_vec())
+            .wait()
+            .unwrap_or_default();
 
         let mut request = Request {
             uri: parts.uri,
@@ -38,7 +42,7 @@ impl Request {
             querys: Vec::new(),
             posts: Vec::new(),
             files: Vec::new(),
-            body: body
+            body: body,
         };
 
         request.parse_query();
@@ -59,7 +63,7 @@ impl Request {
 
     #[inline]
     pub fn param(&self, key: &str) -> Option<String> {
-        self.params.get(key).map(|m| m.to_string() )
+        self.params.get(key).map(|m| m.to_string())
     }
 
     #[inline]
@@ -69,7 +73,10 @@ impl Request {
 
     #[inline]
     pub fn query(&self, key: &str) -> Option<String> {
-        self.querys.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| v.to_string())
+        self.querys
+            .iter()
+            .find(|&&(ref k, _)| k == key)
+            .map(|&(_, ref v)| v.to_string())
     }
 
     #[inline]
@@ -79,7 +86,10 @@ impl Request {
 
     #[inline]
     pub fn post(&self, key: &str) -> Option<String> {
-        self.posts.iter().find(|&&(ref k, _)| k == key ).map(|&(_, ref v)| v.to_string())
+        self.posts
+            .iter()
+            .find(|&&(ref k, _)| k == key)
+            .map(|&(_, ref v)| v.to_string())
     }
 
     #[inline]
@@ -90,7 +100,7 @@ impl Request {
     pub fn header(&self, name: &str) -> Option<String> {
         if let Some(value) = self.headers.get(name) {
             let value = String::from_utf8_lossy(value.as_bytes());
-            return Some(value.to_string())
+            return Some(value.to_string());
         }
 
         None
@@ -106,7 +116,7 @@ impl Request {
         if let Some(value) = self.headers.get(CONTENT_TYPE) {
             if let Ok(value) = value.to_str() {
                 if let Ok(mime) = value.parse::<Mime>() {
-                    return Some(mime)
+                    return Some(mime);
                 }
             }
         }
@@ -118,7 +128,7 @@ impl Request {
     fn parse_query(&mut self) {
         let url = match self.uri().query() {
             Some(url) => url.to_owned(),
-            None => return
+            None => return,
         };
 
         self.querys = url::from_str::<Vec<(String, String)>>(&url).unwrap_or_default();
@@ -126,19 +136,17 @@ impl Request {
 
     #[inline]
     fn parse_post(&mut self) {
-
         let content_type = match self.content_type() {
             Some(c) => c.to_owned(),
-            None => return
+            None => return,
         };
 
         if content_type == mime::APPLICATION_WWW_FORM_URLENCODED {
-
             let params = String::from_utf8_lossy(&self.body);
             self.posts = url::from_str::<Vec<(String, String)>>(&params).unwrap_or_default();
-
-        } else if content_type.type_() == mime::MULTIPART && content_type.subtype() == mime::FORM_DATA {
-
+        } else if content_type.type_() == mime::MULTIPART
+            && content_type.subtype() == mime::FORM_DATA
+        {
             let form_data = self.parse_formdata();
 
             if let Some(form_data) = form_data {
