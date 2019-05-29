@@ -17,11 +17,10 @@ pub struct Context<'a> {
     pub response: Response,
     /// contexts key-value container
     pub contexts: Message,
-    stop: bool
+    stop: bool,
 }
 
 impl<'a> Context<'a> {
-
     pub(crate) fn new(app: &App, hyper_request: hyper::Request<hyper::Body>) -> Context {
         let request = Request::from_hyper_request(hyper_request);
         let response = Response::empty(200);
@@ -31,7 +30,7 @@ impl<'a> Context<'a> {
             request: request,
             response: response,
             contexts: Message::new(),
-            stop: false
+            stop: false,
         }
     }
     /// Stop the handle to continue.

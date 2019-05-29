@@ -1,20 +1,19 @@
 use std::borrow::Cow;
 
-use serde::de::{self, IntoDeserializer};
 use serde::de::value::MapDeserializer;
+use serde::de::{self, IntoDeserializer};
 use url::form_urlencoded::Parse;
 
 pub use serde::de::value::Error;
 
-
 pub struct Decoder<'de> {
-    inner: MapDeserializer<'de, PartIterator<'de>, Error>
+    inner: MapDeserializer<'de, PartIterator<'de>, Error>,
 }
 
 impl<'de> Decoder<'de> {
     pub fn new(parser: Parse<'de>) -> Self {
         Decoder {
-            inner: MapDeserializer::new(PartIterator(parser))
+            inner: MapDeserializer::new(PartIterator(parser)),
         }
     }
 }
@@ -23,25 +22,29 @@ impl<'de> de::Deserializer<'de> for Decoder<'de> {
     type Error = Error;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where V: de::Visitor<'de>
+    where
+        V: de::Visitor<'de>,
     {
         self.deserialize_map(visitor)
     }
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where V: de::Visitor<'de>
+    where
+        V: de::Visitor<'de>,
     {
         visitor.visit_map(self.inner)
     }
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where V: de::Visitor<'de>
+    where
+        V: de::Visitor<'de>,
     {
         visitor.visit_seq(self.inner)
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where V:  de::Visitor<'de>
+    where
+        V: de::Visitor<'de>,
     {
         self.inner.end()?;
         visitor.visit_unit()
@@ -115,13 +118,15 @@ impl<'de> de::Deserializer<'de> for Part<'de> {
     type Error = Error;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where V: de::Visitor<'de>
+    where
+        V: de::Visitor<'de>,
     {
         self.0.into_deserializer().deserialize_any(visitor)
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-        where V: de::Visitor<'de>
+    where
+        V: de::Visitor<'de>,
     {
         visitor.visit_some(self)
     }

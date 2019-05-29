@@ -1,9 +1,9 @@
 /// Route group
 use std::collections::HashMap;
 
-use super::route::Route;
 use super::context::Context;
 use super::middleware::Middleware;
+use super::route::Route;
 use crate::http::Method;
 
 // use hyper::Method;
@@ -91,7 +91,8 @@ impl Group {
     /// });
     /// ```
     pub fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
+    where
+        H: Fn(&mut Context) + Send + Sync + 'static,
     {
         let route = Route::new(
             method.clone(),

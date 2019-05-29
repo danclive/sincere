@@ -1,19 +1,19 @@
 //! App container.
-use hyper::{Request, Response, Body};
 use hyper::Method;
+use hyper::{Body, Request, Response};
 
-pub use self::route::Route;
+use self::context::Context;
 pub use self::group::Group;
 use self::middleware::Middleware;
-use self::context::Context;
+pub use self::route::Route;
 use crate::error::Result;
 
 #[macro_use]
 mod macros;
-mod route;
+pub mod context;
 mod group;
 pub mod middleware;
-pub mod context;
+mod route;
 
 pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 
@@ -40,7 +40,7 @@ pub struct App {
     before: Vec<Middleware>,
     after: Vec<Middleware>,
     finish: Vec<Middleware>,
-    not_found: Option<Middleware>
+    not_found: Option<Middleware>,
 }
 
 impl App {
@@ -61,7 +61,7 @@ impl App {
             before: Vec::new(),
             after: Vec::new(),
             finish: Vec::new(),
-            not_found: None
+            not_found: None,
         }
     }
 
@@ -80,7 +80,8 @@ impl App {
     /// });
     /// ```
     pub fn add<H>(&mut self, method: Method, pattern: &str, handle: H) -> &mut Route
-        where H: Fn(&mut Context) + Send + Sync + 'static
+    where
+        H: Fn(&mut Context) + Send + Sync + 'static,
     {
         self.groups.get_mut(0).unwrap().add(method, pattern, handle)
     }
@@ -270,12 +271,13 @@ impl App {
     /// });
     /// ```
     pub fn mount<F>(&mut self, prefix: &str, func: F) -> &mut App
-        where F: Fn(&mut Group)
+    where
+        F: Fn(&mut Group),
     {
-        let mut group = Group::new(prefix); 
+        let mut group = Group::new(prefix);
 
         func(&mut group);
-        
+
         self.groups.push(group);
         self
     }
@@ -397,7 +399,8 @@ impl App {
     /// });
     /// ```
     pub fn middleware<F>(&mut self, func: F) -> &mut App
-        where F: Fn(&mut App)
+    where
+        F: Fn(&mut App),
     {
         func(self);
         self
@@ -417,7 +420,8 @@ impl App {
     /// });
     /// ```
     pub fn not_found<H>(&mut self, handle: H)
-        where H: Fn(&mut Context) + Send + Sync + 'static
+    where
+        H: Fn(&mut Context) + Send + Sync + 'static,
     {
         self.not_found = Some(Middleware {
             inner: Box::new(handle),
@@ -426,7 +430,6 @@ impl App {
 
     /// handle
     fn handle(&self, request: Request<Body>) -> Response<Body> {
-
         let mut context = Context::new(self, request);
 
         let mut route_found = false;
@@ -446,9 +449,7 @@ impl App {
             };
 
             'outer: for group in self.groups.iter() {
-
                 if let Some(routes) = group.routes.get(context.request.method()) {
-
                     for route in routes.iter() {
                         if let Some(ref regex) = route.regex {
                             let caps = regex.captures(&path);
@@ -459,7 +460,10 @@ impl App {
                                 let matches = route.path();
 
                                 for (key, value) in matches.iter() {
-                                    context.request.params().insert(key.to_owned(), caps.get(*value).unwrap().as_str().to_owned());
+                                    context.request.params().insert(
+                                        key.to_owned(),
+                                        caps.get(*value).unwrap().as_str().to_owned(),
+                                    );
                                 }
                             }
                         } else {
@@ -478,7 +482,6 @@ impl App {
                         }
 
                         if route_found {
-
                             for before in self.before.iter() {
                                 before.execute(&mut context);
                             }
@@ -507,7 +510,11 @@ impl App {
                 if let Some(ref not_found) = self.not_found {
                     not_found.execute(&mut context);
                 } else {
-                    context.response.status_code(404).from_text("Not Found").unwrap();
+                    context
+                        .response
+                        .status_code(404)
+                        .from_text("Not Found")
+                        .unwrap();
                 }
             }
         }
@@ -536,11 +543,11 @@ impl App {
     /// ```
     ///
     pub fn run(&self, addr: &str, thread_size: usize) -> Result<()> {
-        use queen_log::color::Print;
         use futures::future::Future;
         use futures_cpupool::CpuPool;
-        use hyper::{self, Response, Body, Server};
         use hyper::service::service_fn;
+        use hyper::{self, Body, Response, Server};
+        use queen_log::color::Print;
 
         type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
@@ -550,11 +557,11 @@ impl App {
         };
 
         let sincere_logo = Print::green(
-        r"
+            r"
          __.._..  . __ .___.__ .___
         (__  | |\ |/  `[__ [__)[__
         .__)_|_| \|\__.[___|  \[___
-        "
+        ",
         );
 
         println!("{}", sincere_logo);
@@ -571,7 +578,6 @@ impl App {
         let thread_pool = CpuPool::new(thread_size);
 
         let new_svc = move || {
-
             let pool = thread_pool.clone();
 
             service_fn(move |req| -> BoxFut {
@@ -582,9 +588,11 @@ impl App {
 
                 Box::new(rep)
             })
-         };
+        };
 
-        let server = Server::bind(&addr).serve(new_svc).map_err(|e| eprintln!("server error: {}", e));
+        let server = Server::bind(&addr)
+            .serve(new_svc)
+            .map_err(|e| eprintln!("server error: {}", e));
         hyper::rt::run(server);
 
         Ok(())
