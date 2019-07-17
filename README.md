@@ -26,7 +26,7 @@ Don't forget add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-sincere = "0.5.8"
+sincere = "0.6.6"
 ```
 Build and run, then, visiting `http://127.0.0.1:8000/`, you will see `Hello world` on the screen.
 

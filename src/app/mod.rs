@@ -1,6 +1,10 @@
 //! App container.
-use hyper::{Request, Response, Body};
-use hyper::Method;
+use hyper::{self, Server, Request, Response, Body, Method};
+use hyper::service::service_fn;
+use futures::future::Future;
+use futures_cpupool::CpuPool;
+
+use queen_log::color::Print;
 
 pub use self::route::Route;
 pub use self::group::Group;
@@ -536,12 +540,6 @@ impl App {
     /// ```
     ///
     pub fn run(&self, addr: &str, thread_size: usize) -> Result<()> {
-        use queen_log::color::Print;
-        use futures::future::Future;
-        use futures_cpupool::CpuPool;
-        use hyper::{self, Response, Body, Server};
-        use hyper::service::service_fn;
-
         type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
 
         let app = unsafe {
