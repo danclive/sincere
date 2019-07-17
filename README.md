@@ -1,8 +1,9 @@
 # Sincere
 
 [![crates.io](https://meritbadge.herokuapp.com/sincere)](https://crates.io/crates/sincere)
-[![Build Status](https://travis-ci.org/mitum/sincere.svg?branch=master)](https://travis-ci.org/mitum/sincere)
+[![Build Status](https://travis-ci.org/danclive/sincere.svg?branch=master)](https://travis-ci.org/danclive/sincere)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Released API docs](https://docs.rs/sincere/badge.svg)](https://docs.rs/sincere)
 
 Sincere is a micro web framework for Rust(stable) based on hyper and multithreadind. Style like koa. The same, which aims to be a smaller, more expressive, and more robust foundation for web applications and APIs. Sincere does not bundle any middleware within core, and provides an elegant suite of methods that make writing servers fast and enjoyable.
 Here is an example of a simple application:
