@@ -1,8 +1,8 @@
-use std::path::PathBuf;
-use std::io::Read;
 use std::fmt;
 use std::fs::File;
+use std::io::Read;
 use std::io::Write;
+use std::path::PathBuf;
 
 use mime_guess;
 
@@ -35,10 +35,10 @@ use crate::http::mime::{self, Mime};
 
 #[derive(Debug, Default)]
 pub struct Multipart<'a> {
-    fields: Vec<Field<'a>>
+    fields: Vec<Field<'a>>,
 }
 
-impl <'a> Multipart<'a> {
+impl<'a> Multipart<'a> {
     /// Returns the empty `Multipart` set.
     ///
     /// # Examples
@@ -50,9 +50,7 @@ impl <'a> Multipart<'a> {
     /// ```
     #[inline]
     pub fn new() -> Multipart<'a> {
-        Multipart {
-            fields: Vec::new()
-        }
+        Multipart { fields: Vec::new() }
     }
 
     /// Add text 'key-value' into `Multipart`.
@@ -68,11 +66,12 @@ impl <'a> Multipart<'a> {
     /// ```
     #[inline]
     pub fn add_text<V>(&mut self, name: V, value: V) -> &mut Self
-        where V: Into<String>
+    where
+        V: Into<String>,
     {
         let filed = Field {
             name: name.into(),
-            data: Data::Text(value.into())
+            data: Data::Text(value.into()),
         };
 
         self.fields.push(filed);
@@ -93,11 +92,13 @@ impl <'a> Multipart<'a> {
     /// ```
     #[inline]
     pub fn add_file<V, P>(&mut self, name: V, path: P) -> &mut Self
-        where V: Into<String>, P: Into<PathBuf>
+    where
+        V: Into<String>,
+        P: Into<PathBuf>,
     {
         let filed = Field {
             name: name.into(),
-            data: Data::File(path.into())
+            data: Data::File(path.into()),
         };
 
         self.fields.push(filed);
@@ -120,16 +121,24 @@ impl <'a> Multipart<'a> {
     /// multipart.add_stream("ddd", reader, Some("hello.rs"), Some(sincere::http::mime::APPLICATION_JSON));
     /// ```
     #[inline]
-    pub fn add_stream<V, R>(&mut self, name: V, stream: R, filename: Option<V>, mime: Option<Mime>) -> &mut Self
-        where R: Read + 'a, V: Into<String>
+    pub fn add_stream<V, R>(
+        &mut self,
+        name: V,
+        stream: R,
+        filename: Option<V>,
+        mime: Option<Mime>,
+    ) -> &mut Self
+    where
+        R: Read + 'a,
+        V: Into<String>,
     {
         let filed = Field {
             name: name.into(),
             data: Data::Stream(Stream {
                 content_type: mime.unwrap_or(mime::APPLICATION_OCTET_STREAM),
                 filename: filename.map(|f| f.into()),
-                stream: Box::new(stream)
-            })
+                stream: Box::new(stream),
+            }),
         };
 
         self.fields.push(filed);
@@ -219,13 +228,13 @@ impl <'a> Multipart<'a> {
 #[derive(Debug)]
 struct Field<'a> {
     name: String,
-    data: Data<'a>
+    data: Data<'a>,
 }
 
 enum Data<'a> {
     Text(String),
     File(PathBuf),
-    Stream(Stream<'a>)
+    Stream(Stream<'a>),
 }
 
 impl<'a> fmt::Debug for Data<'a> {
@@ -241,7 +250,7 @@ impl<'a> fmt::Debug for Data<'a> {
 struct Stream<'a> {
     filename: Option<String>,
     content_type: Mime,
-    stream: Box<Read + 'a>
+    stream: Box<Read + 'a>,
 }
 
 fn mime_filename(path: &PathBuf) -> (Mime, Option<&str>) {

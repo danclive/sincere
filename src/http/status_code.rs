@@ -50,7 +50,7 @@ impl StatusCode {
             503 => "Service Unavailable",
             504 => "Gateway Time-out",
             505 => "HTTP Version not supported",
-            _ => "Unknown"
+            _ => "Unknown",
         }
     }
 }

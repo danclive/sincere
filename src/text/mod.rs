@@ -1,4 +1,3 @@
-
 /// Uppercase the first character of each word in a string
 pub fn unwords(text: &str, pattern: &str) -> String {
     let text = text.to_lowercase();
@@ -11,7 +10,7 @@ pub fn unwords(text: &str, pattern: &str) -> String {
 
         {
             let s = s.get_mut(0..1);
-            s.map(|s| s.make_ascii_uppercase() );
+            s.map(|s| s.make_ascii_uppercase());
         }
 
         if k != 0 {
