@@ -141,41 +141,11 @@ impl Response {
 
     #[inline]
     pub(crate) fn raw_response(self) -> hyper::Response<hyper::Body> {
-        /*
-        let mut response = hyper::Response::new();
-
-        response.set_status(hyper::StatusCode::try_from(self.get_status_code()).unwrap());
-
-        let mut headers = hyper::Headers::with_capacity(16);
-
-        let data_len = self.body.len();
-
-        if data_len > 0 {
-            headers.set(ContentLength(data_len as u64));
-
-            response.set_body(self.body);
-        }
+        let mut header_builder = hyper::Response::builder()
+            .status(self.get_status_code());
 
         for (key, value) in self.headers.iter() {
-            headers.set_raw(key.to_string(), value.to_string());
-        }
-
-        response = response.with_headers(headers);
-
-        response
-        */
-
-        // let mut response = hyper::Response::new(hyper::Body::empty());
-
-        // if self.body.len() > 0 {
-        //     *response.body_mut() = hyper::Body::from(self.body);
-        // }
-        let mut header_builder = hyper::Response::builder();
-
-        header_builder.status(self.get_status_code());
-
-        for (key, value) in self.headers.iter() {
-            header_builder.header(&**key, &**value);
+            header_builder = header_builder.header(&**key, &**value);
         }
 
         header_builder.body(hyper::Body::from(self.body)).unwrap()

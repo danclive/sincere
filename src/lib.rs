@@ -10,7 +10,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! sincere = "0.5.8"
+//! sincere = "0.7.0-alpha.1"
 //! ```
 //!
 //! Then, add this to your crate root:
@@ -41,20 +41,12 @@ extern crate regex;
 #[macro_use]
 extern crate serde;
 extern crate httparse;
-extern crate libc;
 extern crate num_cpus;
 extern crate rand;
 extern crate serde_json;
-extern crate tempdir;
 extern crate twoway;
 extern crate url;
-
-extern crate futures;
-extern crate futures_cpupool;
 extern crate hyper;
-
-#[allow(unused_imports)]
-#[macro_use]
 extern crate queen_log;
 extern crate mime;
 extern crate mime_guess;
@@ -73,8 +65,5 @@ pub use self::error::Error;
 pub use queen_log::*;
 
 pub mod log {
-    pub use queen_log::color;
-    pub use queen_log::{init, Level, Log, Metadata, Record};
-    pub use queen_log::{DefaultLogger, Logger};
-    pub use queen_log::{LOG, MAX_LEVEL};
+    pub use queen_log::{color, QueenLogger, init};
 }

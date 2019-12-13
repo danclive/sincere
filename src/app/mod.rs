@@ -1,8 +1,10 @@
 //! App container.
 use hyper::{self, Server, Request, Response, Body, Method};
-use hyper::service::service_fn;
-use futures::future::Future;
-use futures_cpupool::CpuPool;
+use hyper::service::{service_fn, make_service_fn};
+use hyper::body::Bytes;
+use http::request::Parts;
+use tokio::runtime::Runtime;
+use tokio::task;
 
 use queen_log::color::Print;
 
@@ -19,7 +21,7 @@ mod group;
 pub mod middleware;
 pub mod context;
 
-pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
+pub type Handle = dyn Fn(&mut Context) + Send + Sync + 'static;
 
 /// App container.
 ///
@@ -33,7 +35,7 @@ pub type Handle = Fn(&mut Context) + Send + Sync + 'static;
 ///         context.response.from_text("Hello world!").unwrap();
 ///     });
 ///
-///     app.run("0.0.0.0:10001", 4).unwrap();
+///     app.run("0.0.0.0:10001").unwrap();
 /// }
 /// ```
 ///
@@ -429,9 +431,9 @@ impl App {
     }
 
     /// handle
-    fn handle(&self, request: Request<Body>) -> Response<Body> {
+    fn handle(&self, parts: Parts, body: Bytes) -> Response<Body> {
 
-        let mut context = Context::new(self, request);
+        let mut context = Context::new(self, parts, body);
 
         let mut route_found = false;
 
@@ -535,18 +537,11 @@ impl App {
     ///         context.response.from_text("Hello world!").unwrap();
     ///     });
     ///
-    ///     app.run("0.0.0.0:10001", 4).unwrap();
+    ///     app.run("0.0.0.0:10001").unwrap();
     /// }
     /// ```
     ///
-    pub fn run(&self, addr: &str, thread_size: usize) -> Result<()> {
-        type BoxFut = Box<Future<Item = Response<Body>, Error = hyper::Error> + Send>;
-
-        let app = unsafe {
-            let a: *const App = &*self;
-            &*a
-        };
-
+    pub fn run(&self, addr: &str) -> Result<()> {
         let sincere_logo = Print::green(
         r"
          __.._..  . __ .___.__ .___
@@ -557,33 +552,43 @@ impl App {
 
         println!("{}", sincere_logo);
         println!(
-            "    {}{} {} {} {}",
+            "    {}{}",
             Print::green("Server running at http://"),
-            Print::green(addr),
-            Print::green("on"),
-            Print::green(thread_size),
-            Print::green("threads.")
+            Print::green(addr)
         );
 
-        let addr = addr.parse().expect("Address is not valid");
-        let thread_pool = CpuPool::new(thread_size);
+        let app = unsafe {
+            let a: *const App = &*self;
+            &*a
+        };
 
-        let new_svc = move || {
+        let echo = move |req: Request<Body>| async move {
 
-            let pool = thread_pool.clone();
+            let (parts, body) = req.into_parts();
+            let body = hyper::body::to_bytes(body).await?;
 
-            service_fn(move |req| -> BoxFut {
-                let rep = pool.spawn_fn(move || {
-                    let response = app.handle(req);
-                    Ok(response)
-                });
+            let join = task::spawn_blocking(move || {
+                app.handle(parts, body)
+            });
 
-                Box::new(rep)
-            })
-         };
+            let res = join.await.expect("The task being joined has panicked");
 
-        let server = Server::bind(&addr).serve(new_svc).map_err(|e| eprintln!("server error: {}", e));
-        hyper::rt::run(server);
+            Ok::<_, hyper::Error>(res)
+        };
+
+        let service = make_service_fn(|_| async move { Ok::<_, hyper::Error>(service_fn(echo)) });
+
+        let mut rt = Runtime::new()?;
+
+        rt.block_on(async {
+            let addr = addr.parse().expect("Address is not valid");
+
+            let server = Server::bind(&addr).serve(service);
+
+            if let Err(e) = server.await {
+                eprintln!("server error: {}", e);
+            }
+        });
 
         Ok(())
     }

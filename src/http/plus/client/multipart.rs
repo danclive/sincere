@@ -250,11 +250,11 @@ impl<'a> fmt::Debug for Data<'a> {
 struct Stream<'a> {
     filename: Option<String>,
     content_type: Mime,
-    stream: Box<Read + 'a>,
+    stream: Box<dyn Read + 'a>,
 }
 
 fn mime_filename(path: &PathBuf) -> (Mime, Option<&str>) {
-    let content_type = mime_guess::guess_mime_type(path);
+    let content_type = mime_guess::from_path(path).first_or_octet_stream();
     let filename = opt_filename(path);
     (content_type, filename)
 }

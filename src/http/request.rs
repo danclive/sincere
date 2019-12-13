@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use futures::{Future, Stream};
 use hyper::header::CONTENT_TYPE;
 use hyper::{self, HeaderMap, Method, Uri, Version};
+use hyper::body::Bytes;
+use http::request::Parts;
 use mime::{self, Mime};
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -21,18 +22,11 @@ pub struct Request {
     querys: Vec<(String, String)>,
     posts: Vec<(String, String)>,
     files: Vec<FilePart>,
-    body: Vec<u8>,
+    body: Bytes
 }
 
 impl Request {
-    pub(crate) fn from_hyper_request(hyper_request: hyper::Request<hyper::Body>) -> Request {
-        let (parts, body) = hyper_request.into_parts();
-        let body = body
-            .concat2()
-            .map(|b| b.to_vec())
-            .wait()
-            .unwrap_or_default();
-
+    pub(crate) fn from_hyper_request(parts: Parts, body: Bytes) -> Request {
         let mut request = Request {
             uri: parts.uri,
             method: parts.method,
@@ -42,7 +36,7 @@ impl Request {
             querys: Vec::new(),
             posts: Vec::new(),
             files: Vec::new(),
-            body: body,
+            body
         };
 
         request.parse_query();
@@ -171,7 +165,7 @@ impl Request {
     }
 
     #[inline]
-    pub fn body(&self) -> &Vec<u8> {
+    pub fn body(&self) -> &Bytes {
         &self.body
     }
 

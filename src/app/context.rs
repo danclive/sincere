@@ -1,5 +1,7 @@
 //! App context.
 use hyper;
+use hyper::body::Bytes;
+use http::request::Parts;
 
 use nson::Message;
 
@@ -21,8 +23,8 @@ pub struct Context<'a> {
 }
 
 impl<'a> Context<'a> {
-    pub(crate) fn new(app: &App, hyper_request: hyper::Request<hyper::Body>) -> Context {
-        let request = Request::from_hyper_request(hyper_request);
+    pub(crate) fn new(app: &App, parts: Parts, body: Bytes) -> Context {
+        let request = Request::from_hyper_request(parts, body);
         let response = Response::empty(200);
 
         Context {
