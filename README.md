@@ -1,3 +1,5 @@
+# The project is no longer maintained！
+
 # Sincere
 
 [![crates.io](https://meritbadge.herokuapp.com/sincere)](https://crates.io/crates/sincere)
